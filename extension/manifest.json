@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Browsing Assistant",
+  "version": "1.0",
+  "description": "Chat with an AI that controls your browser",
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "host_permissions": ["https://vercel-ai-mcp.webfuse.it/*"],
+  "env": [
+    { "key": "API_URL", "value": "", "description": "Next.js server URL" }
+  ]
+}
