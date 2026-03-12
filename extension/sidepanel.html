@@ -37,6 +37,24 @@
   }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
   .typing { animation: pulse 1.5s infinite; }
+  #examples {
+    padding: 8px 16px;
+  }
+  #examples p {
+    font-size: 11px; color: #666; margin-bottom: 8px;
+  }
+  .example-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .chip {
+    padding: 6px 12px; border-radius: 16px;
+    background: #1a1a2e; border: 1px solid #2a2a4a;
+    font-size: 12px; color: #a0a0c0; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chip:hover {
+    background: #1e3a5f; border-color: #3b82f6; color: #e0e0e0;
+  }
   footer {
     padding: 12px 16px; border-top: 1px solid #2a2a4a;
     display: flex; gap: 8px;
@@ -63,14 +81,24 @@
 <body>
   <header>
     <h2>💬 Browsing Assistant</h2>
-    <p>Ask me to do anything on this page</p>
+    <p>I can read, click, scroll, and navigate this page for you</p>
   </header>
   <div id="messages"></div>
+  <div id="examples">
+    <p>Try asking:</p>
+    <div class="example-chips">
+      <span class="chip" onclick="askExample(this)">What is this page about?</span>
+      <span class="chip" onclick="askExample(this)">Summarize the key facts</span>
+      <span class="chip" onclick="askExample(this)">What does the infobox say?</span>
+      <span class="chip" onclick="askExample(this)">Click on the History section</span>
+      <span class="chip" onclick="askExample(this)">Scroll down to see more</span>
+    </div>
+  </div>
   <footer>
-    <input id="input" placeholder="e.g. What's on this page?" autofocus>
+    <input id="input" placeholder="Ask anything about this page…" autofocus>
     <button id="send" onclick="sendMessage()">Send</button>
   </footer>
-  <div class="powered">Powered by <a href="https://webfuse.com">Webfuse</a> + <a href="https://sdk.vercel.ai">Vercel AI SDK</a></div>
+  <div class="powered">Powered by <a href="https://webfuse.com" target="_blank">Webfuse</a> + <a href="https://sdk.vercel.ai" target="_blank">Vercel AI SDK</a></div>
   <script src="sidepanel.js"></script>
 </body>
 </html>

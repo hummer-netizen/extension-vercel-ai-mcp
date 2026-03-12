@@ -2,6 +2,7 @@ const API_URL = browser.webfuseSession.env.API_URL || 'https://vercel-ai-mcp.web
 const messagesEl = document.getElementById('messages');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
+const examplesEl = document.getElementById('examples');
 
 let messages = [];
 let sessionId = null;
@@ -10,7 +11,6 @@ let sessionId = null;
   try {
     const info = await browser.webfuseSession.getSessionInfo();
     sessionId = info.sessionId;
-    addMessage('ai', '\ud83d\udc4b Ready! Ask me to do anything on this page.');
   } catch (e) {
     addMessage('ai', '\u26a0\ufe0f Could not connect to Webfuse session.');
   }
@@ -19,6 +19,11 @@ let sessionId = null;
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
+
+function askExample(el) {
+  input.value = el.textContent;
+  sendMessage();
+}
 
 function addMessage(role, text) {
   const el = document.createElement('div');
@@ -50,6 +55,9 @@ async function sendMessage() {
   var text = input.value.trim();
   if (!text) return;
   if (!sessionId) { addMessage('ai', '\u26a0\ufe0f No active session.'); return; }
+
+  // Hide examples after first message
+  if (examplesEl) examplesEl.style.display = 'none';
 
   input.value = '';
   sendBtn.disabled = true;
@@ -87,7 +95,7 @@ async function sendMessage() {
       aiEl.textContent = '\u274c ' + data.error;
       messages.pop();
     } else {
-      aiEl.textContent = '\ud83e\udd14 No response. Try again.';
+      aiEl.textContent = '\ud83e\udd14 No response. Try again or ask differently.';
       messages.pop();
     }
   } catch (e) {
