@@ -46,6 +46,32 @@ function showToolUse(toolName) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// Parse Vercel AI SDK data stream — newlines may be stripped by proxy
+function parseDataStream(text) {
+  let aiText = '';
+  const toolNames = [];
+
+  // Match 0:"..." text tokens (the value is a JSON string)
+  const textRegex = /(?:^|\n|})0:((?:"(?:[^"\\]|\\.)*")|(?:\{[^}]*\}))/g;
+  let m;
+  while ((m = textRegex.exec(text)) !== null) {
+    try {
+      aiText += JSON.parse(m[1]);
+    } catch {}
+  }
+
+  // Match 9:{...} tool call events
+  const toolRegex = /9:(\{[^}]+\})/g;
+  while ((m = toolRegex.exec(text)) !== null) {
+    try {
+      const data = JSON.parse(m[1]);
+      if (data.toolName) toolNames.push(data.toolName);
+    } catch {}
+  }
+
+  return { aiText, toolNames };
+}
+
 async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
@@ -72,38 +98,22 @@ async function sendMessage() {
       throw new Error(`Server error ${resp.status}: ${errText.slice(0, 200)}`);
     }
 
-    // Read the entire response as text first, then parse
     const fullText = await resp.text();
-    console.log('[vercel-ext] Full response length:', fullText.length);
-    console.log('[vercel-ext] First 500 chars:', fullText.slice(0, 500));
+    const { aiText, toolNames } = parseDataStream(fullText);
 
-    let aiText = '';
-    for (const line of fullText.split('\n')) {
-      if (line.startsWith('0:')) {
-        try {
-          aiText += JSON.parse(line.slice(2));
-        } catch {}
-      } else if (line.startsWith('9:')) {
-        try {
-          const data = JSON.parse(line.slice(2));
-          if (data.toolName) showToolUse(data.toolName);
-        } catch {}
-      }
-    }
-
-    console.log('[vercel-ext] Parsed aiText length:', aiText.length);
-    console.log('[vercel-ext] aiText:', aiText.slice(0, 200));
+    // Show tool indicators
+    toolNames.forEach(t => showToolUse(t));
 
     if (aiText) {
       aiEl.textContent = aiText;
       messages.push({ role: 'assistant', content: aiText });
     } else {
-      aiEl.textContent = '🤔 No text in response. Check console for debug info.';
-      console.log('[vercel-ext] NO TEXT FOUND. Full response:', fullText);
+      aiEl.textContent = '🤔 No response text found. The AI may have only used tools.';
+      console.log('[vercel-ext] No text. Response length:', fullText.length);
+      console.log('[vercel-ext] First 1000:', fullText.slice(0, 1000));
     }
   } catch (e) {
     aiEl.textContent = '❌ ' + e.message;
-    console.error('[vercel-ext] Error:', e);
     messages.pop();
   }
 
