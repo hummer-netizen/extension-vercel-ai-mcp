@@ -36,13 +36,13 @@ function addMessage(role, text) {
 
 function showToolUse(toolName) {
   var names = {
-    see_domSnapshot: '\ud83d\udc41\ufe0f Reading page',
-    act_click: '\ud83d\udc46 Clicking',
-    act_type: '\u2328\ufe0f Typing',
-    act_keyPress: '\u2328\ufe0f Pressing key',
-    act_scroll: '\ud83d\udcdc Scrolling',
-    navigate: '\ud83e\udded Navigating',
-    wait: '\u23f3 Waiting',
+    see_domSnapshot: 'reading the page...',
+    act_click: 'clicking something...',
+    act_type: 'typing away...',
+    act_keyPress: 'pressing keys...',
+    act_scroll: 'scrolling...',
+    navigate: 'navigating...',
+    wait: 'waiting...',
   };
   var el = document.createElement('div');
   el.className = 'msg tool';

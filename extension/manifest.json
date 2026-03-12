@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Browsing Assistant",
-  "version": "1.1",
-  "description": "Chat with an AI that controls your browser — built with Vercel AI SDK + Webfuse MCP",
+  "name": "Hacker News Copilot 🍊",
+  "version": "1.2",
+  "description": "Your AI sidekick for the orange site — reads, summarizes, clicks, and comments",
   "background": { "service_worker": "background.js" },
   "side_panel": { "default_path": "sidepanel.html" },
   "host_permissions": ["<all_urls>"],

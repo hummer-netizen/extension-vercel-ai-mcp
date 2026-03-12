@@ -5,95 +5,111 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #0f0f1a; color: #e0e0e0;
+    font-family: Verdana, Geneva, sans-serif;
+    background: #f6f6ef; color: #828282;
     display: flex; flex-direction: column; height: 100vh;
+    font-size: 10pt;
   }
   header {
-    padding: 12px 16px; border-bottom: 1px solid #2a2a4a;
+    background: #ff6600; padding: 4px 8px;
+    display: flex; align-items: center; gap: 8px;
   }
-  header h2 { font-size: 15px; color: #3b82f6; }
-  header p { font-size: 11px; color: #666; margin-top: 2px; }
+  header .logo { font-size: 16px; }
+  header h2 {
+    font-size: 13px; font-weight: bold; color: #000;
+    letter-spacing: -0.5px;
+  }
+  header p { font-size: 9px; color: #000; opacity: 0.7; }
   #messages {
-    flex: 1; overflow-y: auto; padding: 12px 16px;
+    flex: 1; overflow-y: auto; padding: 8px;
   }
   .msg {
-    margin: 8px 0; padding: 10px 12px; border-radius: 12px;
-    font-size: 13px; line-height: 1.5; max-width: 90%;
-    word-wrap: break-word;
+    margin: 6px 0; padding: 6px 8px; font-size: 9pt;
+    line-height: 1.5; word-wrap: break-word;
   }
   .msg.user {
-    background: #1e3a5f; margin-left: auto; border-bottom-right-radius: 4px;
+    background: #ffeedd; border-left: 3px solid #ff6600;
+    margin-left: 20px;
   }
   .msg.ai {
-    background: #1a1a2e; border: 1px solid #2a2a4a; border-bottom-left-radius: 4px;
+    background: #fff; border: 1px solid #e0d8d0;
+    color: #000;
   }
   .msg.tool {
-    background: #1a2e1a; border: 1px solid #2a4a2a; font-size: 11px; color: #8b8;
-    padding: 6px 10px; margin: 4px 0;
+    background: transparent; font-size: 8pt; color: #828282;
+    padding: 2px 8px; margin: 2px 0;
+    font-style: italic;
   }
-  .typing { color: #666; font-style: italic; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .typing { color: #828282; font-style: italic; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .typing { animation: pulse 1.5s infinite; }
-  #examples { padding: 8px 16px; }
-  #examples p { font-size: 11px; color: #666; margin-bottom: 8px; }
-  .example-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  #examples { padding: 8px; }
+  #examples p { font-size: 8pt; color: #828282; margin-bottom: 6px; font-style: italic; }
+  .example-chips { display: flex; flex-wrap: wrap; gap: 4px; }
   .chip {
-    padding: 6px 12px; border-radius: 16px;
-    background: #1a1a2e; border: 1px solid #2a2a4a;
-    font-size: 12px; color: #a0a0c0; cursor: pointer;
-    transition: all 0.15s;
+    padding: 3px 8px; border-radius: 3px;
+    background: #fff; border: 1px solid #e0d8d0;
+    font-size: 8pt; color: #828282; cursor: pointer;
+    font-family: Verdana, Geneva, sans-serif;
+    transition: all 0.1s;
   }
-  .chip:hover { background: #1e3a5f; border-color: #3b82f6; color: #e0e0e0; }
+  .chip:hover { background: #ffeedd; border-color: #ff6600; color: #000; }
   footer {
-    padding: 12px 16px; border-top: 1px solid #2a2a4a;
-    display: flex; gap: 8px;
+    padding: 6px 8px; border-top: 2px solid #ff6600;
+    display: flex; gap: 6px; background: #f6f6ef;
   }
   input {
-    flex: 1; padding: 10px 12px; border-radius: 8px;
-    border: 1px solid #2a2a4a; background: #1a1a2e; color: #e0e0e0;
-    font-size: 13px; outline: none;
+    flex: 1; padding: 6px 8px; border-radius: 3px;
+    border: 1px solid #e0d8d0; background: #fff; color: #000;
+    font-size: 9pt; outline: none;
+    font-family: Verdana, Geneva, sans-serif;
   }
-  input:focus { border-color: #3b82f6; }
+  input:focus { border-color: #ff6600; }
   input:disabled { opacity: 0.5; }
   button {
-    padding: 10px 16px; border: none; border-radius: 8px;
-    background: #3b82f6; color: white; font-weight: 600;
-    cursor: pointer; font-size: 13px;
-    transition: background 0.15s;
+    padding: 4px 12px; border: none; border-radius: 3px;
+    background: #ff6600; color: white; font-weight: bold;
+    cursor: pointer; font-size: 9pt;
+    font-family: Verdana, Geneva, sans-serif;
   }
-  button:hover { background: #2563eb; }
-  button:disabled { background: #333; cursor: not-allowed; }
-  .powered { text-align: center; padding: 6px; font-size: 10px; color: #444; }
-  .powered a { color: #3b82f6; text-decoration: none; }
+  button:hover { background: #e55b00; }
+  button:disabled { background: #ccc; cursor: not-allowed; }
+  .powered {
+    text-align: center; padding: 4px; font-size: 8pt; color: #828282;
+    border-top: 1px solid #e0d8d0;
+  }
+  .powered a { color: #ff6600; text-decoration: none; }
 </style>
 </head>
 <body>
   <header>
-    <h2>💬 Browsing Assistant</h2>
-    <p>I can read, click, scroll, and navigate this page for you</p>
+    <span class="logo">🍊</span>
+    <div>
+      <h2>Hacker News Copilot</h2>
+      <p>your AI sidekick for the orange site</p>
+    </div>
   </header>
   <div id="messages"></div>
   <div id="examples">
-    <p>Try asking:</p>
+    <p>go ahead, try one:</p>
     <div class="example-chips">
-      <span class="chip" onclick="askExample(this)">What's trending on this page?</span>
-      <span class="chip" onclick="askExample(this)">Summarize the top 5 stories</span>
-      <span class="chip" onclick="askExample(this)">What has the most points?</span>
-      <span class="chip" onclick="askExample(this)">Show me the comments on the #1 story</span>
-      <span class="chip" onclick="askExample(this)">Click on the 3rd link and tell me what it's about</span>
-      <span class="chip" onclick="askExample(this)">Which stories are Show HN posts?</span>
-      <span class="chip" onclick="askExample(this)">Find any AI-related posts</span>
-      <span class="chip" onclick="askExample(this)">How many points does story #5 have?</span>
-      <span class="chip" onclick="askExample(this)">What's the newest story on the page?</span>
-      <span class="chip" onclick="askExample(this)">Are there any job posts?</span>
+      <span class="chip" onclick="askExample(this)">🔥 What's trending?</span>
+      <span class="chip" onclick="askExample(this)">📋 Top 5 stories</span>
+      <span class="chip" onclick="askExample(this)">🏆 Most upvoted?</span>
+      <span class="chip" onclick="askExample(this)">💬 Comments on #1</span>
+      <span class="chip" onclick="askExample(this)">👀 Open story #3</span>
+      <span class="chip" onclick="askExample(this)">🤖 Any AI posts?</span>
+      <span class="chip" onclick="askExample(this)">🆕 Newest story?</span>
+      <span class="chip" onclick="askExample(this)">💼 Job posts?</span>
+      <span class="chip" onclick="askExample(this)">🚀 Show HN posts?</span>
+      <span class="chip" onclick="askExample(this)">😂 Write a funny comment on #1</span>
     </div>
   </div>
   <footer>
-    <input id="input" placeholder="Ask anything about this page…" autofocus>
-    <button id="send" onclick="sendMessage()">Send</button>
+    <input id="input" placeholder="ask me anything about HN…" autofocus>
+    <button id="send" onclick="sendMessage()">go</button>
   </footer>
-  <div class="powered">Powered by <a href="https://webfuse.com" target="_blank">Webfuse</a> + <a href="https://sdk.vercel.ai" target="_blank">Vercel AI SDK</a></div>
+  <div class="powered">powered by <a href="https://webfuse.com" target="_blank">webfuse</a> + <a href="https://sdk.vercel.ai" target="_blank">vercel ai sdk</a></div>
   <script src="sidepanel.js"></script>
 </body>
 </html>
