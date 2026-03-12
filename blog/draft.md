@@ -1,11 +1,11 @@
 ---
-title: "Build a Browsing Assistant with Vercel AI SDK and Webfuse"
-description: "Create a Next.js chat app where an AI reads, clicks, and types in the user's live browser. Vercel AI SDK + Webfuse MCP. Try the Hacker News demo."
+title: "Build a Browsing Assistant with Vercel AI SDK and Webfuse MCP"
+description: "Give your Next.js app browser superpowers. One API route connects the Vercel AI SDK to a live browser via MCP. The AI reads pages, clicks links, and types in forms."
 shortTitle: "Vercel AI SDK + Webfuse MCP"
 created: 2026-03-11
 category: ai-agents
 authorId: nicholas-piel
-tags: ["vercel", "ai-sdk", "nextjs", "mcp", "browser-automation", "webfuse", "typescript", "human-in-the-loop"]
+tags: ["vercel", "ai-sdk", "nextjs", "mcp", "browser-automation", "webfuse", "typescript"]
 featurePriority: 0
 relatedLinks:
   - text: "LangChain + Webfuse"
@@ -14,64 +14,50 @@ relatedLinks:
   - text: "OpenAI Agent + Webfuse"
     href: "/blog/build-an-ai-agent-that-controls-a-live-browser"
     description: "Guided journey demo with the OpenAI Agents SDK."
-  - text: "Claude Desktop + Webfuse"
-    href: "/blog/connect-claude-to-a-live-browser-with-webfuse-mcp"
-    description: "Zero-code setup with Claude Desktop."
   - text: "Session MCP Server Docs"
     href: "https://dev.webfu.se/session-mcp-server/"
     description: "Full reference for the 13 browser tools."
 faqs:
   - question: "Can I deploy this to Vercel?"
-    answer: "Yes. The Next.js app deploys like any other. The MCP connection happens server-side in the API route."
+    answer: "Yes. The Next.js app deploys like any other. The MCP connection happens server-side in the API route. Set OPENAI_API_KEY and WEBFUSE_REST_KEY as environment variables."
   - question: "Does it work with other models?"
-    answer: "Yes. The Vercel AI SDK supports OpenAI, Anthropic, Google, and more. Swap the model provider in one line."
-  - question: "Is this a chatbot or an automation tool?"
-    answer: "Both. Users chat naturally. The AI decides when to use browser tools. It's a conversation that can also click buttons and type in forms."
+    answer: "Yes. The Vercel AI SDK supports OpenAI, Anthropic, Google, and more. Swap the model provider in one line — the MCP tools work identically."
   - question: "Why generateText instead of streamText?"
-    answer: "The AI often chains multiple tool calls per message (read page, click link, read again). generateText waits for all steps to complete and returns the final result. Simpler and more reliable."
-  - question: "Can the user see what the AI is doing?"
-    answer: "Yes. The AI works in the user's live browser. Every click, navigation, and scroll happens in real time. The user watches and can intervene at any point."
+    answer: "The AI often chains multiple tool calls per message (read page → click → read again). generateText waits for all steps to complete and returns the final result cleanly."
+  - question: "What's the latency?"
+    answer: "Simple questions (from pre-loaded context): 2-3 seconds. Multi-step actions (navigate + read): 5-15 seconds. Depends on the model and page complexity."
 ---
 
-What if your Next.js app could browse the web for your users?
+What if your Next.js app could browse the web?
 
-Not fetch an API. Not scrape a page. Actually browse. Click links. Read content. Type in forms. All through a chat interface that works alongside any website.
+Not fetch an API. Not scrape HTML. Actually browse — click links, read pages, type in forms — all driven by an AI model through a chat interface.
+
+The Vercel AI SDK already handles tool calling, multi-step reasoning, and model switching. Webfuse adds 13 browser tools via MCP. Connect the two and you get a chat app that controls a live browser session.
 
 <TldrBox title="TL;DR">
 
-**Vercel AI SDK + Webfuse MCP = a chat app that controls a live browser.** One API route. One MCP endpoint. The AI reads pages, clicks links, and types in forms. The user watches it happen.
+One API route. One MCP endpoint. `generateText` + `maxSteps` handles the rest. The AI auto-discovers 13 browser tools and chains them to read, click, and type across any website.
 
 Source: [github.com/hummer-netizen/extension-vercel-ai-mcp](https://github.com/hummer-netizen/extension-vercel-ai-mcp)
 
-Live demo: [webfu.se/+vercel-ai-mcp/](https://webfu.se/+vercel-ai-mcp/) — try it on Hacker News
+Live demo: [webfu.se/+vercel-ai-mcp/](https://webfu.se/+vercel-ai-mcp/)
 
 </TldrBox>
 
-## The Demo
+## How It Works
 
-The live demo drops you on Hacker News with a sidebar. Try things like:
+The Vercel AI SDK has built-in MCP support through `experimental_createMCPClient`. Point it at the Webfuse Session MCP endpoint and it auto-discovers 13 browser tools: read DOM snapshots, click elements, type text, navigate, scroll, take screenshots.
 
-- **"What's trending?"** — The AI reads the page and summarizes the top stories with points and comment counts.
-- **"Open story #3"** — It clicks into the article, reads it, and tells you what it's about.
-- **"Show me the comments on #1"** — Navigates to the HN comments page and summarizes the discussion.
-- **"Write a funny comment on #1"** — This is the fun one. The AI navigates to the comments page, finds the text input, and *types a comment directly into the box*. It doesn't submit. You review it, laugh (or cringe), and decide whether to post.
-
-That last one is the key. The AI does the work, but you stay in control. Human-in-the-loop by default.
-
-## The Stack
-
-- **Next.js** with one API route for the chat endpoint
-- **Vercel AI SDK** for multi-step tool execution and MCP integration
-- **Webfuse Session MCP** for browser control (13 tools, auto-discovered)
-- **Webfuse Extension** for the sidebar chat UI
+`generateText` with `maxSteps: 10` lets the AI chain these tools. Ask "open the top story and summarize it" and GPT-4o will: read the page → click the link → read the article → respond. Four tool calls, one user message, zero glue code.
 
 ## The API Route
 
-The entire backend is one file:
+The entire backend is one file — `app/api/chat/route.ts`:
 
 ```typescript
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { experimental_createMCPClient as createMCPClient } from "ai";
 
 export async function POST(req: Request) {
@@ -95,71 +81,92 @@ export async function POST(req: Request) {
 
   const { text, steps } = await generateText({
     model: openai("gpt-4o"),
-    system: "You are a browsing assistant. You can see and control the user's browser.",
+    system: "You are a browsing assistant. Use browser tools to answer questions about the current page.",
     messages,
-    tools,        // 13 Webfuse browser tools, auto-discovered
-    maxSteps: 10, // AI can chain up to 10 tool calls per message
+    tools,        // 13 browser tools, auto-discovered via MCP
+    maxSteps: 10, // chain up to 10 tool calls per message
   });
 
   await mcpClient.close();
 
-  return Response.json({ text, toolNames: steps.flatMap(s =>
-    (s.toolCalls || []).map(tc => tc.toolName)
-  )});
+  return Response.json({
+    text,
+    toolNames: steps.flatMap(s =>
+      (s.toolCalls || []).map(tc => tc.toolName)
+    ),
+  });
 }
 ```
 
-The Vercel AI SDK's `createMCPClient` connects to Webfuse and auto-discovers all 13 browser tools. `generateText` handles tool calls, chaining, and multi-step reasoning. You don't parse tool calls. You don't manage state.
+That's the core. `createMCPClient` handles the MCP handshake. `generateText` handles tool calling and multi-step chaining. You don't parse tool schemas, manage state, or write tool dispatch logic.
 
-`maxSteps: 10` means the AI can chain up to 10 actions per message. Ask "open the top story and summarize it" and it will click the link, wait for the page to load, read the content, and respond. One message, four tool calls.
+The `toolNames` in the response tell the frontend which tools were used, so it can show indicators like "reading the page..." while the user waits.
 
-## Giving the AI Context
+## Pre-Loading Page Context
 
-One trick that makes a huge difference: read the page before the AI even starts thinking.
+One pattern that makes a big difference: read the page before the model starts thinking.
 
 ```typescript
-// On first message, auto-read the page and inject as context
-if (messages.length === 1) {
-  const overview = await tools['see_domSnapshot'].execute({
+const rawTools = await mcpClient.tools();
+
+// On first message, inject current page content as context
+if (messages.length === 1 && messages[0].role === 'user') {
+  const snapshot = rawTools['see_domSnapshot'];
+  const overview = await snapshot.execute({
     session_id: sessionId,
-    options: { root: 'body', quality: 0.1 }
+    options: { root: 'body', quality: 0.1 },
   });
-  // Prepend page content to the user's message
-  messages[0].content = `[Page content]\n${overview}\n\nUser: ${messages[0].content}`;
+
+  messages = [{
+    role: 'user',
+    content: `[Current page content]:\n${overview}\n\nUser: ${messages[0].content}`,
+  }];
 }
 ```
 
-The `quality: 0.1` parameter returns a compact text-only version of the page. On Hacker News, this gives the AI all 30 story titles with their points and IDs in about 8KB. Now when the user says "what has the most points?", the AI already knows. No tool call needed. Instant response.
+The `quality: 0.1` parameter returns a compact text summary of the page. On a typical page, that's 5-10KB of structured content. Now when the user asks "what's on this page?" the model already knows — instant response, no tool call needed.
 
-## The Human-in-the-Loop Part
+For follow-up messages, the model uses tools on demand. First message is fast, subsequent messages are smart.
 
-Most AI demos show agents doing things autonomously. Cool to watch. Scary to deploy.
+## Handling Large Pages
 
-This demo takes a different approach. The AI works in the user's real browser. Every action is visible. When the AI writes a comment, it types it in the text box and stops. The user reads it, edits it, submits it — or deletes it.
+Web pages can be enormous. A full Wikipedia article is 2MB of HTML — way beyond any model's context window. Wrap tool results with a size cap:
 
-For actions that matter (posting comments, filling forms, submitting orders), this isn't a limitation. It's the whole point. The AI does the tedious part. The human makes the call.
+```typescript
+function wrapTools(tools: Record<string, any>): Record<string, any> {
+  const wrapped: Record<string, any> = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    wrapped[name] = {
+      ...tool,
+      execute: async (args: any, options: any) => {
+        const result = await tool.execute(args, options);
+        const str = typeof result === 'string' ? result : JSON.stringify(result);
+        if (str.length > 15_000) {
+          return str.slice(0, 15_000) + '\n... [truncated — use a narrower CSS selector]';
+        }
+        return result;
+      },
+    };
+  }
+  return wrapped;
+}
 
-## Making It Production-Ready
+const tools = wrapTools(await mcpClient.tools());
+```
 
-The [actual route.ts](https://github.com/hummer-netizen/extension-vercel-ai-mcp/blob/main/app/api/chat/route.ts) adds a few things on top of the core:
+The hint in the truncation message matters. The model reads "use a narrower CSS selector" and on the next step it targets `"article"` or `".main-content"` instead of `"body"`. It learns to be specific.
 
-**Tool result truncation.** Web pages can be huge. A full Wikipedia article is 2MB of HTML. Cap tool results at 15,000 characters and the AI will automatically use narrower CSS selectors.
+## The Frontend
 
-**Page-aware system prompt.** Tell the AI about the page structure so it can use the right selectors. For HN: how to find story IDs, how to navigate to comments, where the text input is.
-
-**Auto-read on first message.** Read the page content once, inject it as context. The AI answers simple questions instantly without any tool calls.
-
-## The Chat UI
-
-The sidebar is a Webfuse extension. The demo uses an HN-themed design (Verdana, orange accents), but the architecture works for any site.
+The chat UI runs as a Webfuse extension sidebar. The key integration point:
 
 ```javascript
-// Get the Webfuse session ID
+// Webfuse gives you the session ID — this is the link between
+// your backend and the user's live browser tab
 const info = await browser.webfuseSession.getSessionInfo();
 const sessionId = info.sessionId;
 
-// Send to your API route
-const resp = await fetch(`${API_URL}/api/chat`, {
+const resp = await fetch('/api/chat', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ messages, sessionId }),
@@ -168,51 +175,50 @@ const resp = await fetch(`${API_URL}/api/chat`, {
 const { text, toolNames } = await resp.json();
 ```
 
-The response includes the AI's text and which tools it used. The UI shows casual indicators — "reading the page...", "clicking something..." — while the user waits.
+The `sessionId` is the bridge. Your API route passes it to every MCP tool call. Webfuse routes those tool calls to the correct browser tab. The user sees the AI click and type in real time.
 
-Suggested actions ("chips") give new users a starting point. Each one is tested and known to work.
+The demo includes pre-built prompt suggestions to help new users get started. On Hacker News, things like "What's trending?", "Open story #3", and "Write a funny comment on #1" — that last one types a comment directly into the text box without submitting, so the user stays in control.
 
-## Swapping Models
+## Switching Models
 
-Switching models is a one-line change:
+One of the best parts of the Vercel AI SDK — model switching is a one-line change:
 
 ```typescript
-// OpenAI
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
+
+// Pick one:
 const model = openai("gpt-4o");
-
-// Anthropic
 const model = anthropic("claude-sonnet-4-20250514");
-
-// Google
 const model = google("gemini-2.0-flash");
 ```
 
-The Webfuse MCP tools work identically across all models. Same tools, same schema, same behavior.
+The MCP tools work identically across all providers. Same tool schemas, same behavior, same results.
 
 ::ArticleSignupCta
 ---
 heading: "Give your Next.js app a browser"
-subtitle: "Webfuse connects the Vercel AI SDK to live web sessions via MCP. Build browsing assistants in minutes."
+subtitle: "Connect the Vercel AI SDK to live browser sessions via MCP. Build browsing assistants in one API route."
 ---
 ::
 
-## Beyond Hacker News
+## What You Can Build
 
-The demo uses HN because it's fun and everyone knows it. But the pattern works for any site:
+The demo runs on Hacker News. The pattern works anywhere:
 
-- **Customer support.** "What does this user's account page show?" — the agent reads the real page with real data.
-- **Internal tools.** A sidebar on your admin dashboard that answers questions about what's on screen.
-- **Shopping assistants.** "Find me a blue jacket under $100" — the agent searches, filters, and shows you options.
-- **Form helpers.** "Fill in my shipping address" — the agent types in the fields. You review and submit.
+- **Customer support tools.** A sidebar that reads the user's actual account page and answers questions about their data.
+- **Internal dashboards.** "What's the error rate this week?" — the agent reads your Grafana dashboard and summarizes.
+- **Shopping assistants.** "Find a blue jacket under $100" — it searches, filters, scrolls through results.
+- **Form automation.** "Fill in my shipping address" — it types in the fields. You review and submit.
 
-Same code. Different system prompt. Different site.
+Same API route. Different system prompt. Different website.
 
-## Source Code
+## Try It
 
-Everything is on GitHub: [hummer-netizen/extension-vercel-ai-mcp](https://github.com/hummer-netizen/extension-vercel-ai-mcp)
+Live demo: [webfu.se/+vercel-ai-mcp/](https://webfu.se/+vercel-ai-mcp/)
 
-- `app/api/chat/route.ts` — One API route. The whole backend.
-- `extension/` — Webfuse sidebar extension (HN-themed chat UI)
-- `blog/` — This blog post
+Source code: [github.com/hummer-netizen/extension-vercel-ai-mcp](https://github.com/hummer-netizen/extension-vercel-ai-mcp)
 
-Try the live demo: [webfu.se/+vercel-ai-mcp/](https://webfu.se/+vercel-ai-mcp/)
+- `app/api/chat/route.ts` — the complete API route
+- `extension/` — Webfuse sidebar extension
