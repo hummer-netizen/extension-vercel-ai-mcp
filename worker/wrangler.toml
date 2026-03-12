@@ -1,0 +1,4 @@
+name = "vercel-ai-mcp-proxy"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+routes = [{ pattern = "vercel-ai-mcp.webfuse.it", custom_domain = true }]
