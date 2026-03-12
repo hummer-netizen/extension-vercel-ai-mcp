@@ -32,12 +32,9 @@ function addMessage(role, text) {
 function showToolUse(toolName) {
   const names = {
     see_domSnapshot: '👁️ Reading page',
-    see_accessibilityTree: '🌳 Reading structure',
     act_click: '👆 Clicking', act_type: '⌨️ Typing',
     act_keyPress: '⌨️ Pressing key', act_scroll: '📜 Scrolling',
-    act_mouseMove: '🖱️ Hovering', act_select: '📋 Selecting',
-    act_textSelect: '✏️ Highlighting', navigate: '🧭 Navigating',
-    wait: '⏳ Waiting',
+    navigate: '🧭 Navigating', wait: '⏳ Waiting',
   };
   const el = document.createElement('div');
   el.className = 'msg tool';
@@ -46,27 +43,55 @@ function showToolUse(toolName) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// Parse Vercel AI SDK data stream — newlines may be stripped by proxy
+// Parse Vercel AI SDK data stream — proxy strips newlines
 function parseDataStream(text) {
   let aiText = '';
   const toolNames = [];
 
-  // Match 0:"..." text tokens (the value is a JSON string)
-  const textRegex = /(?:^|\n|})0:((?:"(?:[^"\\]|\\.)*")|(?:\{[^}]*\}))/g;
-  let m;
-  while ((m = textRegex.exec(text)) !== null) {
-    try {
-      aiText += JSON.parse(m[1]);
-    } catch {}
+  // Find all 0:"..." text tokens
+  // They appear as: }0:"text" or "0:"text" or \n0:"text"
+  // Use a simple approach: find every 0:" and parse the JSON string after it
+  let idx = 0;
+  while (idx < text.length) {
+    // Find next 0:" pattern
+    const pos = text.indexOf('0:"', idx);
+    if (pos === -1) break;
+
+    // Make sure this is a stream prefix, not inside a JSON value
+    // Check that char before is }, ", \n, or start of string
+    if (pos > 0) {
+      const prev = text[pos - 1];
+      if (prev !== '}' && prev !== '"' && prev !== '\n' && prev !== ')') {
+        idx = pos + 3;
+        continue;
+      }
+    }
+
+    // Extract the JSON string starting at the "
+    const strStart = pos + 2; // points to opening "
+    // Find the closing " (handle escaped quotes)
+    let j = strStart + 1;
+    while (j < text.length) {
+      if (text[j] === '\\') { j += 2; continue; }
+      if (text[j] === '"') break;
+      j++;
+    }
+    if (j < text.length) {
+      const jsonStr = text.slice(strStart, j + 1);
+      try {
+        aiText += JSON.parse(jsonStr);
+      } catch {}
+      idx = j + 1;
+    } else {
+      break;
+    }
   }
 
-  // Match 9:{...} tool call events
-  const toolRegex = /9:(\{[^}]+\})/g;
+  // Find 9:{...toolName...} tool events
+  const toolRegex = /9:\{"toolCallId":"[^"]*","toolName":"([^"]*)"/g;
+  let m;
   while ((m = toolRegex.exec(text)) !== null) {
-    try {
-      const data = JSON.parse(m[1]);
-      if (data.toolName) toolNames.push(data.toolName);
-    } catch {}
+    toolNames.push(m[1]);
   }
 
   return { aiText, toolNames };
@@ -101,16 +126,19 @@ async function sendMessage() {
     const fullText = await resp.text();
     const { aiText, toolNames } = parseDataStream(fullText);
 
-    // Show tool indicators
     toolNames.forEach(t => showToolUse(t));
 
     if (aiText) {
       aiEl.textContent = aiText;
       messages.push({ role: 'assistant', content: aiText });
     } else {
-      aiEl.textContent = '🤔 No response text found. The AI may have only used tools.';
-      console.log('[vercel-ext] No text. Response length:', fullText.length);
-      console.log('[vercel-ext] First 1000:', fullText.slice(0, 1000));
+      aiEl.textContent = '🤔 No response. Try again or ask differently.';
+      console.log('[vercel-ext] No text. Length:', fullText.length);
+      // Log area around where 0: should appear (after last e: line)
+      const lastE = fullText.lastIndexOf('e:{');
+      if (lastE > -1) {
+        console.log('[vercel-ext] Around last e:', fullText.slice(lastE, lastE + 300));
+      }
     }
   } catch (e) {
     aiEl.textContent = '❌ ' + e.message;
