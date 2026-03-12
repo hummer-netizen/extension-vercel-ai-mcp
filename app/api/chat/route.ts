@@ -69,6 +69,40 @@ export async function POST(req: Request) {
     const rawTools = await mcpClient.tools();
     const tools = wrapTools(rawTools);
 
+    // Auto-read page on first message: fetch overview via MCP directly
+    let contextMessages = [...messages];
+    if (messages.length === 1 && messages[0].role === 'user') {
+      try {
+        const overviewResp = await fetch("https://session-mcp.webfu.se/mcp", {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${restKey}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0', id: 99,
+            method: 'tools/call',
+            params: { name: 'see_domSnapshot', arguments: { session_id: sessionId, options: { root: 'body', quality: 0.1 } } },
+          }),
+        });
+        const overviewText = await overviewResp.text();
+        const dataLine = overviewText.split('\n').find((l: string) => l.startsWith('data:'));
+        if (dataLine) {
+          const data = JSON.parse(dataLine.slice(5));
+          const pageText = data?.result?.content?.[0]?.text || '';
+          if (pageText.length > 50) {
+            const trimmed = pageText.slice(0, 8000);
+            contextMessages = [
+              { role: 'user', content: '[Current page content]:\n' + trimmed + '\n\nUser question: ' + messages[0].content },
+            ];
+          }
+        }
+      } catch (e) {
+        console.log('[auto-read error]', e);
+      }
+    }
+
     const { text, steps } = await generateText({
       model: openai("gpt-4o"),
       system: `You are a browsing assistant controlling the user's CURRENT browser tab via Webfuse.
@@ -101,7 +135,7 @@ CLICKING LINKS:
 IMPORTANT: Always read the page first before answering. Never guess or ask for context — the answer is on the page.
 
 Be concise. Summarize what you find. When listing items, include their rank/number.`,
-      messages,
+      messages: contextMessages,
       tools,
       maxSteps: 10,
     });
