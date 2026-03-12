@@ -24,6 +24,8 @@ faqs:
     answer: "Yes. The Vercel AI SDK supports OpenAI, Anthropic, Google, and more. Swap the model provider in one line."
   - question: "Is this a chatbot or an automation tool?"
     answer: "Both. Users chat naturally. The AI decides when to use browser tools. It's a conversation that can also click buttons."
+  - question: "Why generateText instead of streamText?"
+    answer: "The Webfuse proxy buffers responses between multi-step tool calls. generateText waits for all steps to complete, then returns the final result. Simpler and more reliable."
 ---
 
 What if your Next.js app could browse the web for your users?
@@ -36,6 +38,8 @@ Not fetch an API. Not scrape a page. Actually browse. Click links. Fill forms. R
 
 Source: [github.com/hummer-netizen/extension-vercel-ai-mcp](https://github.com/hummer-netizen/extension-vercel-ai-mcp)
 
+Live demo: [webfu.se/+vercel-ai-mcp/](https://webfu.se/+vercel-ai-mcp/)
+
 </TldrBox>
 
 ## The Idea
@@ -44,25 +48,24 @@ Most AI chat apps are text-in, text-out. The AI reasons about what you said and 
 
 This one has hands.
 
-The user types "find the cheapest flight to Amsterdam." The AI opens a travel site, fills in the search, scrolls through results, and reports back. The user watches it happen in their browser. If the AI picks the wrong date, the user just says "make it March 15th" and the AI corrects it.
+The user types "what is this page about?" The AI reads the page title and content, then answers. The user asks "what are the main attractions?" The AI clicks through to the Tourism section, reads it, and lists the highlights. All in a natural conversation.
 
-It's a conversation that can also click buttons.
+It's a chat interface with browser superpowers.
 
 ## The Stack
 
 - **Next.js** with an API route for the chat endpoint
-- **Vercel AI SDK** for streaming responses and MCP tool integration
+- **Vercel AI SDK** for multi-step tool execution and MCP integration
 - **Webfuse Session MCP** for browser control (13 tools, auto-discovered)
 - **Webfuse Extension** for the sidebar chat UI
 
 ## The API Route
 
-The entire backend is one file. Here's the core:
+The entire backend is one file. Here's the essence:
 
 ```typescript
-import { streamText } from "ai";
+import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { experimental_createMCPClient as createMCPClient } from "ai";
 
 export async function POST(req: Request) {
@@ -84,42 +87,62 @@ export async function POST(req: Request) {
 
   const tools = await mcpClient.tools();
 
-  const result = streamText({
+  const { text, steps } = await generateText({
     model: openai("gpt-4o"),
-    system: `You are a helpful browsing assistant.
-      You can see and control the user's browser.`,
+    system: "You are a browsing assistant. You can see and control the user's browser.",
     messages,
-    tools,       // 13 Webfuse browser tools, auto-discovered
+    tools,        // 13 Webfuse browser tools, auto-discovered
     maxSteps: 10, // AI can chain up to 10 tool calls per message
-    onFinish: () => mcpClient.close(),
   });
 
-  return result.toDataStreamResponse();
+  await mcpClient.close();
+
+  return Response.json({ text, toolNames: steps.flatMap(s =>
+    (s.toolCalls || []).map(tc => tc.toolName)
+  )});
 }
 ```
 
-That's it. The Vercel AI SDK's `createMCPClient` connects to the Webfuse Session MCP endpoint and auto-discovers all 13 browser tools. `streamText` handles tool calls, chaining, and streaming. You don't parse tool calls. You don't manage state.
+That's it. The Vercel AI SDK's `createMCPClient` connects to the Webfuse Session MCP endpoint and auto-discovers all 13 browser tools. `generateText` handles tool calls, chaining, and multi-step reasoning. You don't parse tool calls. You don't manage state.
 
-`maxSteps: 10` means the AI can chain up to 10 tool calls per message. It might snapshot the page, then click a link, then snapshot again, then read a table. All from one user message.
+`maxSteps: 10` means the AI can chain up to 10 tool calls per message. It might read the page title, then click a TOC link, then read a section, then summarize. All from one user message.
+
+We use `generateText` instead of `streamText` because the AI often needs multiple steps (read page, then respond). `generateText` waits for all steps to complete and returns the final result. Clean and reliable.
+
+## Making It Production-Ready
+
+The demo code above is the concept. The [actual route.ts](https://github.com/hummer-netizen/extension-vercel-ai-mcp/blob/main/app/api/chat/route.ts) adds two things for reliability:
+
+**Tool result truncation.** Web pages can be huge. A full Wikipedia article is 2MB of HTML. The production code caps tool results at 15,000 characters and tells the AI to use narrower CSS selectors if content is truncated.
+
+**CSS selector sanitization.** The Webfuse proxy has its own CSS parser that doesn't support pseudo-selectors (`:nth-child`, `:first-of-type`) or sibling combinators (`~`, `+`). The production code strips these before passing selectors to MCP tools.
+
+Both are a few lines of code. See the repo for details.
 
 ## The Chat UI
 
-A Webfuse extension sidebar with a simple chat interface. Users type messages. The AI responds and uses browser tools as needed.
+A Webfuse extension sidebar with a simple chat interface. Users type messages. The AI responds and shows tool indicators (👁️ Reading page, 👆 Clicking) as it works.
 
-The extension sends messages to the Next.js API route and streams the responses back. No API keys in the browser. No browser control logic on the client. Just a chat window that talks to your backend.
+The extension sends messages to the Next.js API route and displays the response. No API keys in the browser. No browser control logic on the client. Just a chat window.
 
 ```javascript
-// sidepanel.js — get the session ID from Webfuse
+// Get the Webfuse session ID
 const info = await browser.webfuseSession.getSessionInfo();
 const sessionId = info.sessionId;
 
-// Send messages to your API route
+// Send to your API route
 const resp = await fetch(`${API_URL}/api/chat`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ messages, sessionId }),
 });
+
+const { text, toolNames } = await resp.json();
+// text = "This page is about Amsterdam..."
+// toolNames = ["see_domSnapshot", "see_domSnapshot"]
 ```
+
+The response includes both the AI's text and which tools it used, so the UI can show indicators like "👁️ Reading page" while the user waits.
 
 ## Why Chat Beats Scripted Journeys
 
