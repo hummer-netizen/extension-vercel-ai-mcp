@@ -95,6 +95,8 @@ CLICKING LINKS:
 - To click a link by its text, use act_click with selector matching the link
 - To go back, use navigate with the previous URL or the browser back
 
+IMPORTANT: Always read the page first before answering. Never guess or ask for context — the answer is on the page.
+
 Be concise. Summarize what you find. When listing items, include their rank/number.`,
       messages,
       tools,
