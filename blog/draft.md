@@ -51,35 +51,54 @@ It's a conversation that can also click buttons.
 ## The Stack
 
 - **Next.js** with an API route for the chat endpoint
-- **Vercel AI SDK** for streaming responses and tool handling
+- **Vercel AI SDK** for streaming responses and MCP tool integration
 - **Webfuse Session MCP** for browser control (13 tools, auto-discovered)
 - **Webfuse Extension** for the sidebar chat UI
 
 ## The API Route
 
-The entire backend is one file:
+The entire backend is one file. Here's the core:
 
 ```typescript
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { experimental_createMCPClient as createMCPClient } from "ai";
 
 export async function POST(req: Request) {
   const { messages, sessionId } = await req.json();
 
+  // Connect to Webfuse Session MCP — auto-discovers 13 browser tools
+  const mcpClient = await createMCPClient({
+    transport: new StreamableHTTPClientTransport(
+      new URL("https://session-mcp.webfu.se/mcp"),
+      {
+        requestInit: {
+          headers: {
+            Authorization: `Bearer ${process.env.WEBFUSE_REST_KEY}`,
+          },
+        },
+      }
+    ),
+  });
+
+  const tools = await mcpClient.tools();
+
   const result = streamText({
     model: openai("gpt-4o"),
     system: `You are a helpful browsing assistant.
-      You can see and control the user's browser.
-      The session ID is: ${sessionId}`,
+      You can see and control the user's browser.`,
     messages,
-    maxSteps: 10,
+    tools,       // 13 Webfuse browser tools, auto-discovered
+    maxSteps: 10, // AI can chain up to 10 tool calls per message
+    onFinish: () => mcpClient.close(),
   });
 
   return result.toDataStreamResponse();
 }
 ```
 
-The Vercel AI SDK handles MCP tool discovery, execution, and streaming. You don't parse tool calls. You don't manage state. `streamText` does it all.
+That's it. The Vercel AI SDK's `createMCPClient` connects to the Webfuse Session MCP endpoint and auto-discovers all 13 browser tools. `streamText` handles tool calls, chaining, and streaming. You don't parse tool calls. You don't manage state.
 
 `maxSteps: 10` means the AI can chain up to 10 tool calls per message. It might snapshot the page, then click a link, then snapshot again, then read a table. All from one user message.
 
@@ -87,19 +106,50 @@ The Vercel AI SDK handles MCP tool discovery, execution, and streaming. You don'
 
 A Webfuse extension sidebar with a simple chat interface. Users type messages. The AI responds and uses browser tools as needed.
 
-The extension only knows two things: the session ID (from `browser.webfuseSession`) and the API URL. It sends messages to the Next.js API route and streams the responses back.
+The extension sends messages to the Next.js API route and streams the responses back. No API keys in the browser. No browser control logic on the client. Just a chat window that talks to your backend.
 
-No API keys in the extension. No browser logic. Just a chat window.
+```javascript
+// sidepanel.js — get the session ID from Webfuse
+const info = await browser.webfuseSession.getSessionInfo();
+const sessionId = info.sessionId;
+
+// Send messages to your API route
+const resp = await fetch(`${API_URL}/api/chat`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ messages, sessionId }),
+});
+```
 
 ## Why Chat Beats Scripted Journeys
 
-The OpenAI demo (our other integration) runs a fixed 7-step journey. Click "Start" and watch. It's great for demos.
+The OpenAI demo (our other integration) runs a scripted multi-step journey. Great for demos.
 
 But real users don't want a script. They want to talk.
 
-"What does this page say about pricing?" "Click on the Enterprise plan." "Go back and check the FAQ." "Actually, open a new tab and search for alternatives."
+"What does this page say about pricing?" "Click on the Enterprise plan." "Go back and check the FAQ." "Actually, search for alternatives."
 
 A chat interface handles all of this naturally. The AI decides when to use tools based on what the user asks. No predefined steps. No rigid flow.
+
+## Swapping Models
+
+One of the best things about the Vercel AI SDK: switching models is a one-line change.
+
+```typescript
+// OpenAI
+import { openai } from "@ai-sdk/openai";
+const model = openai("gpt-4o");
+
+// Anthropic
+import { anthropic } from "@ai-sdk/anthropic";
+const model = anthropic("claude-sonnet-4-20250514");
+
+// Google
+import { google } from "@ai-sdk/google";
+const model = google("gemini-2.0-flash");
+```
+
+The Webfuse MCP tools work identically across all models. Same tools, same schema, same behavior.
 
 ::ArticleSignupCta
 ---
@@ -130,6 +180,6 @@ It feels like having a coworker who can browse for you while you talk to them.
 
 Everything is on GitHub: [hummer-netizen/extension-vercel-ai-mcp](https://github.com/hummer-netizen/extension-vercel-ai-mcp)
 
-- `app/api/chat/route.ts` -- One API route. The whole backend.
-- `extension/` -- Webfuse sidebar extension (chat UI)
-- `blog/` -- This blog post
+- `app/api/chat/route.ts` — One API route. The whole backend.
+- `extension/` — Webfuse sidebar extension (chat UI)
+- `blog/` — This blog post
