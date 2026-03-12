@@ -77,22 +77,25 @@ The user is already viewing a page. You can see and interact with it.
 RULES:
 - ALWAYS pass session_id: "${sessionId}" to every tool call
 - For see_domSnapshot, ALWAYS include options.root with a CSS selector
-- The user is ALREADY on a page. Never ask for a URL.
-
-CSS SELECTOR RULES (CRITICAL):
-- ONLY use: tag names (h1, p, div), #id, .class, descendant selectors (space)
-- NEVER use: :pseudo-selectors, ~ (sibling), + (adjacent), :has(), :not(), :nth-child()
-- These cause errors and return the wrong content
+- The user is ALREADY on a page. Do not ask them for a URL.
 
 READING STRATEGY:
-1. Page title: "#firstHeading" or "h1"
-2. Table of contents: "#toc"
-3. Summary box: ".infobox"
-4. Specific section heading: "#Tourism", "#History" etc
-5. Page body text: "#bodyContent" - returns first ~15k chars
-6. If content is truncated, click a TOC link then read "#bodyContent" again
+1. Start with a page overview: use see_domSnapshot with options.root = "body" and options.quality = 0.1
+   This returns a compact text-only summary — great for list pages, tables, and navigation.
+2. For specific content: use a narrow CSS selector like "h1", ".infobox", "#section-id", "article"
+3. If content is truncated, use a narrower selector or click a link to navigate deeper.
 
-Be concise. Summarize what you find.`,
+HANDLING LIST PAGES (e.g. Hacker News, search results, product listings):
+- First read the page with quality 0.1 to see all items with their numbers/ranks
+- When the user refers to "the 3rd link" or "item #5", map that to the correct item from the overview
+- To click a specific story/link, use act_click with a selector that targets it (e.g. the link text)
+- After clicking into an article, read the new page content, then you can go back
+
+CLICKING LINKS:
+- To click a link by its text, use act_click with selector matching the link
+- To go back, use navigate with the previous URL or the browser back
+
+Be concise. Summarize what you find. When listing items, include their rank/number.`,
       messages,
       tools,
       maxSteps: 10,
