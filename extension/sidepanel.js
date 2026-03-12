@@ -1,4 +1,4 @@
-const API_URL = browser.webfuseSession.env.API_URL || 'http://localhost:3001';
+const API_URL = browser.webfuseSession.env.API_URL || 'https://vercel-ai-mcp.webfuse.it';
 const messagesEl = document.getElementById('messages');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
