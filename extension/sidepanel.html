@@ -20,6 +20,7 @@
   .msg {
     margin: 8px 0; padding: 10px 12px; border-radius: 12px;
     font-size: 13px; line-height: 1.5; max-width: 90%;
+    word-wrap: break-word;
   }
   .msg.user {
     background: #1e3a5f; margin-left: auto; border-bottom-right-radius: 4px;
@@ -28,8 +29,14 @@
     background: #1a1a2e; border: 1px solid #2a2a4a; border-bottom-left-radius: 4px;
   }
   .msg.tool {
-    background: #1a2e1a; border: 1px solid #2a4a2a; font-size: 11px; color: #888;
+    background: #1a2e1a; border: 1px solid #2a4a2a; font-size: 11px; color: #8b8;
+    padding: 6px 10px; margin: 4px 0;
   }
+  .typing {
+    color: #666; font-style: italic;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .typing { animation: pulse 1.5s infinite; }
   footer {
     padding: 12px 16px; border-top: 1px solid #2a2a4a;
     display: flex; gap: 8px;
@@ -40,13 +47,15 @@
     font-size: 13px; outline: none;
   }
   input:focus { border-color: #3b82f6; }
+  input:disabled { opacity: 0.5; }
   button {
     padding: 10px 16px; border: none; border-radius: 8px;
     background: #3b82f6; color: white; font-weight: 600;
     cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
   }
   button:hover { background: #2563eb; }
-  button:disabled { background: #444; cursor: not-allowed; }
+  button:disabled { background: #333; cursor: not-allowed; }
   .powered { text-align: center; padding: 6px; font-size: 10px; color: #444; }
   .powered a { color: #3b82f6; text-decoration: none; }
 </style>
@@ -61,7 +70,7 @@
     <input id="input" placeholder="e.g. What's on this page?" autofocus>
     <button id="send" onclick="sendMessage()">Send</button>
   </footer>
-  <div class="powered">Powered by <a href="https://webfuse.com">Webfuse</a> + <a href="https://sdk.vercel.ai">Vercel AI</a></div>
+  <div class="powered">Powered by <a href="https://webfuse.com">Webfuse</a> + <a href="https://sdk.vercel.ai">Vercel AI SDK</a></div>
   <script src="sidepanel.js"></script>
 </body>
 </html>
