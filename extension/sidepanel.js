@@ -33,14 +33,10 @@ function showToolUse(toolName) {
   const names = {
     see_domSnapshot: '👁️ Reading page',
     see_accessibilityTree: '🌳 Reading structure',
-    act_click: '👆 Clicking',
-    act_type: '⌨️ Typing',
-    act_keyPress: '⌨️ Pressing key',
-    act_scroll: '📜 Scrolling',
-    act_mouseMove: '🖱️ Hovering',
-    act_select: '📋 Selecting',
-    act_textSelect: '✏️ Highlighting',
-    navigate: '🧭 Navigating',
+    act_click: '👆 Clicking', act_type: '⌨️ Typing',
+    act_keyPress: '⌨️ Pressing key', act_scroll: '📜 Scrolling',
+    act_mouseMove: '🖱️ Hovering', act_select: '📋 Selecting',
+    act_textSelect: '✏️ Highlighting', navigate: '🧭 Navigating',
     wait: '⏳ Waiting',
   };
   const el = document.createElement('div');
@@ -53,10 +49,7 @@ function showToolUse(toolName) {
 async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
-  if (!sessionId) {
-    addMessage('ai', '⚠️ No active session.');
-    return;
-  }
+  if (!sessionId) { addMessage('ai', '⚠️ No active session.'); return; }
 
   input.value = '';
   sendBtn.disabled = true;
@@ -79,53 +72,38 @@ async function sendMessage() {
       throw new Error(`Server error ${resp.status}: ${errText.slice(0, 200)}`);
     }
 
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
+    // Read the entire response as text first, then parse
+    const fullText = await resp.text();
+    console.log('[vercel-ext] Full response length:', fullText.length);
+    console.log('[vercel-ext] First 500 chars:', fullText.slice(0, 500));
+
     let aiText = '';
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete lines only, keep incomplete last line in buffer
-      const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep the incomplete line
-
-      for (const line of lines) {
-        if (line.startsWith('0:')) {
-          try {
-            aiText += JSON.parse(line.slice(2));
-            aiEl.textContent = aiText;
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-          } catch {}
-        } else if (line.startsWith('9:')) {
-          try {
-            const data = JSON.parse(line.slice(2));
-            if (data.toolName) showToolUse(data.toolName);
-          } catch {}
-        }
-      }
-    }
-
-    // Process any remaining buffer
-    if (buffer) {
-      if (buffer.startsWith('0:')) {
+    for (const line of fullText.split('\n')) {
+      if (line.startsWith('0:')) {
         try {
-          aiText += JSON.parse(buffer.slice(2));
-          aiEl.textContent = aiText;
+          aiText += JSON.parse(line.slice(2));
+        } catch {}
+      } else if (line.startsWith('9:')) {
+        try {
+          const data = JSON.parse(line.slice(2));
+          if (data.toolName) showToolUse(data.toolName);
         } catch {}
       }
     }
 
+    console.log('[vercel-ext] Parsed aiText length:', aiText.length);
+    console.log('[vercel-ext] aiText:', aiText.slice(0, 200));
+
     if (aiText) {
+      aiEl.textContent = aiText;
       messages.push({ role: 'assistant', content: aiText });
     } else {
-      aiEl.textContent = '🤔 No response. The AI may have used tools but couldn\'t formulate an answer. Try asking again.';
+      aiEl.textContent = '🤔 No text in response. Check console for debug info.';
+      console.log('[vercel-ext] NO TEXT FOUND. Full response:', fullText);
     }
   } catch (e) {
     aiEl.textContent = '❌ ' + e.message;
+    console.error('[vercel-ext] Error:', e);
     messages.pop();
   }
 
