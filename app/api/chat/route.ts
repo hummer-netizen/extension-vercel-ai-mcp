@@ -5,7 +5,8 @@ import { experimental_createMCPClient as createMCPClient } from "ai";
 
 export const maxDuration = 60;
 
-// CORS: the Webfuse extension sidebar calls this cross-origin
+const MAX_TOOL_RESULT_CHARS = 15000;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -16,27 +17,43 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
+function truncateToolResults(tools: Record<string, any>): Record<string, any> {
+  const wrapped: Record<string, any> = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    const origExecute = tool.execute;
+    wrapped[name] = {
+      ...tool,
+      execute: async (args: any, options: any) => {
+        const result = await origExecute(args, options);
+        const str = typeof result === 'string' ? result : JSON.stringify(result);
+        if (str.length > MAX_TOOL_RESULT_CHARS) {
+          return { content: [{ type: 'text', text: str.slice(0, MAX_TOOL_RESULT_CHARS) + '\n... [truncated, use a narrower selector]' }], isError: false };
+        }
+        return result;
+      },
+    };
+  }
+  return wrapped;
+}
+
 export async function POST(req: Request) {
   const { messages, sessionId } = await req.json();
-
   const restKey = process.env.WEBFUSE_REST_KEY!;
 
-  // Connect to Webfuse Session MCP — auto-discovers 13 browser tools
   const mcpClient = await createMCPClient({
     transport: new StreamableHTTPClientTransport(
       new URL("https://session-mcp.webfu.se/mcp"),
       {
         requestInit: {
-          headers: {
-            Authorization: `Bearer ${restKey}`,
-          },
+          headers: { Authorization: `Bearer ${restKey}` },
         },
       }
     ),
   });
 
   try {
-    const tools = await mcpClient.tools();
+    const rawTools = await mcpClient.tools();
+    const tools = truncateToolResults(rawTools);
 
     const result = streamText({
       model: openai("gpt-4o"),
@@ -45,15 +62,16 @@ The user is already viewing a page. You can see and interact with whatever they 
 
 RULES:
 - ALWAYS pass session_id: "${sessionId}" to every tool call
-- For see_domSnapshot, ALWAYS include options.root with a narrow CSS selector
+- For see_domSnapshot, ALWAYS include options.root with a NARROW CSS selector
 - The user is ALREADY on a page — never ask for a URL. Just read the page.
-- To understand a page, read the title and intro:
-  see_domSnapshot with options.root = "#firstHeading" for the title
-  see_domSnapshot with options.root = "#mw-content-text .mw-parser-output" for Wikipedia content (truncate is OK)
-  see_domSnapshot with options.root = "main" for general pages, or "article", "body > div"
-- Good selectors: ".infobox", "table.wikitable", "#toc", "#firstHeading"
+- Start by reading the title: options.root = "#firstHeading" or "h1"
+- For page content, use NARROW selectors like:
+  "#toc" for table of contents
+  ".infobox" for summary box
+  "p" for paragraphs (limited to visible ones)
+- Do NOT use broad selectors like "#mw-content-text .mw-parser-output" — too large!
 - NEVER call see_domSnapshot without options.root
-- Do NOT use see_guiSnapshot or pseudo-selectors (:first-of-type etc)
+- Do NOT use see_guiSnapshot
 - Be concise and helpful.`,
       messages,
       tools,
@@ -64,8 +82,6 @@ RULES:
     });
 
     const response = result.toDataStreamResponse();
-
-    // Add CORS headers to the streaming response
     for (const [key, value] of Object.entries(corsHeaders)) {
       response.headers.set(key, value);
     }
