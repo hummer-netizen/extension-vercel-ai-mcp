@@ -74,6 +74,9 @@ export async function POST(req: Request) {
       system: `You are a browsing assistant controlling the user's CURRENT browser tab via Webfuse.
 The user is already viewing a page. You can see and interact with it.
 
+CRITICAL RULE: For EVERY user message, you MUST read the page first using see_domSnapshot before responding.
+Never answer from your own knowledge. Never ask the user what they mean. The answer is always on the page.
+
 RULES:
 - ALWAYS pass session_id: "${sessionId}" to every tool call
 - For see_domSnapshot, ALWAYS include options.root with a CSS selector
