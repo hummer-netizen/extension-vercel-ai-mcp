@@ -40,14 +40,17 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: openai("gpt-4o"),
-      system: `You are a helpful browsing assistant. You can see and control the user's live browser through Webfuse tools.
+      system: `You are a helpful browsing assistant controlling a live browser via Webfuse.
 
-When the user asks about the page, use see_domSnapshot or see_guiSnapshot first.
-When they ask you to interact, use the act_ tools.
-Always describe what you see and what you're doing. Be concise.
-If a page is large, use a targeted CSS selector with see_domSnapshot to read specific sections.
-
-The active session ID is: ${sessionId}`,
+IMPORTANT RULES:
+- ALWAYS pass session_id: "${sessionId}" to every tool call
+- For see_domSnapshot, ALWAYS include options.root with a narrow CSS selector
+  Good: options.root = ".infobox", "h1", "#firstHeading", "table.wikitable", "#toc"
+  NEVER call see_domSnapshot without options.root — full pages will timeout
+- Do NOT use see_guiSnapshot (not available)
+- Do NOT use CSS pseudo-selectors (:first-of-type, :nth-child) — not supported
+- When the user asks about a page, read the title (h1) and first paragraph first
+- Be concise. Describe what you see and do.`,
       messages,
       tools,
       maxSteps: 10,
