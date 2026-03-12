@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { experimental_createMCPClient as createMCPClient } from "ai";
@@ -17,12 +17,9 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
-// Strip unsupported CSS features: pseudo-selectors AND sibling combinators
 function sanitizeSelector(selector: string): string {
   let s = selector;
-  // Remove pseudo-classes/elements
   s = s.replace(/:{1,2}[a-zA-Z-]+(\([^)]*\))?/g, '');
-  // Remove ~ (general sibling) and + (adjacent sibling) combinators
   s = s.replace(/\s*[~+]\s*/g, ' ');
   return s.trim();
 }
@@ -34,18 +31,15 @@ function wrapTools(tools: Record<string, any>): Record<string, any> {
     wrapped[name] = {
       ...tool,
       execute: async (args: any, options: any) => {
-        // Sanitize selectors
         if (name === 'see_domSnapshot' && args?.options?.root) {
-          const original = args.options.root;
-          args.options.root = sanitizeSelector(original);
-          if (!args.options.root) args.options.root = 'body';
+          args.options.root = sanitizeSelector(args.options.root) || 'body';
         }
         const result = await origExecute(args, options);
         const str = typeof result === 'string' ? result : JSON.stringify(result);
         if (str.length > MAX_TOOL_RESULT_CHARS) {
           return {
             content: [{ type: 'text', text: str.slice(0, MAX_TOOL_RESULT_CHARS) +
-              '\n... [truncated - content too large. Try a more specific CSS selector or read a different section]' }],
+              '\n... [truncated - use a narrower CSS selector]' }],
             isError: false
           };
         }
@@ -75,7 +69,7 @@ export async function POST(req: Request) {
     const rawTools = await mcpClient.tools();
     const tools = wrapTools(rawTools);
 
-    const result = streamText({
+    const { text, steps } = await generateText({
       model: openai("gpt-4o"),
       system: `You are a browsing assistant controlling the user's CURRENT browser tab via Webfuse.
 The user is already viewing a page. You can see and interact with it.
@@ -92,26 +86,33 @@ CSS SELECTOR RULES (CRITICAL):
 
 READING STRATEGY:
 1. Page title: "#firstHeading" or "h1"
-2. Table of contents: "#toc" - use this to discover section names
-3. Summary box: ".infobox"  
-4. Specific section heading: use the heading ID like "#Tourism", "#History"
-5. Page body text: "#bodyContent" - returns up to 15k chars of content
-6. If you need a specific section not in the first 15k chars, first navigate to it with act_click on a TOC link, then read "#bodyContent" again
+2. Table of contents: "#toc"
+3. Summary box: ".infobox"
+4. Specific section heading: "#Tourism", "#History" etc
+5. Page body text: "#bodyContent" - returns first ~15k chars
+6. If content is truncated, click a TOC link then read "#bodyContent" again
 
 Be concise. Summarize what you find.`,
       messages,
       tools,
       maxSteps: 10,
-      onFinish: async () => {
-        await mcpClient.close();
-      },
     });
 
-    const response = result.toDataStreamResponse();
-    for (const [key, value] of Object.entries(corsHeaders)) {
-      response.headers.set(key, value);
+    await mcpClient.close();
+
+    // Extract tool names used for UI indicators
+    const toolNames: string[] = [];
+    for (const step of steps) {
+      if (step.toolCalls) {
+        for (const tc of step.toolCalls) {
+          toolNames.push(tc.toolName);
+        }
+      }
     }
-    return response;
+
+    return new Response(JSON.stringify({ text, toolNames }), {
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   } catch (e) {
     await mcpClient.close();
     return new Response(JSON.stringify({ error: String(e) }), {

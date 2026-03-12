@@ -10,9 +10,9 @@ let sessionId = null;
   try {
     const info = await browser.webfuseSession.getSessionInfo();
     sessionId = info.sessionId;
-    addMessage('ai', '👋 Ready! Ask me to do anything on this page.');
+    addMessage('ai', '\ud83d\udc4b Ready! Ask me to do anything on this page.');
   } catch (e) {
-    addMessage('ai', '⚠️ Could not connect to Webfuse session.');
+    addMessage('ai', '\u26a0\ufe0f Could not connect to Webfuse session.');
   }
 })();
 
@@ -22,7 +22,7 @@ input.addEventListener('keydown', (e) => {
 
 function addMessage(role, text) {
   const el = document.createElement('div');
-  el.className = `msg ${role}`;
+  el.className = 'msg ' + role;
   el.textContent = text;
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -30,77 +30,26 @@ function addMessage(role, text) {
 }
 
 function showToolUse(toolName) {
-  const names = {
-    see_domSnapshot: '👁️ Reading page',
-    act_click: '👆 Clicking', act_type: '⌨️ Typing',
-    act_keyPress: '⌨️ Pressing key', act_scroll: '📜 Scrolling',
-    navigate: '🧭 Navigating', wait: '⏳ Waiting',
+  var names = {
+    see_domSnapshot: '\ud83d\udc41\ufe0f Reading page',
+    act_click: '\ud83d\udc46 Clicking',
+    act_type: '\u2328\ufe0f Typing',
+    act_keyPress: '\u2328\ufe0f Pressing key',
+    act_scroll: '\ud83d\udcdc Scrolling',
+    navigate: '\ud83e\udded Navigating',
+    wait: '\u23f3 Waiting',
   };
-  const el = document.createElement('div');
+  var el = document.createElement('div');
   el.className = 'msg tool';
-  el.textContent = names[toolName] || `🔧 ${toolName}`;
+  el.textContent = names[toolName] || ('\ud83d\udd27 ' + toolName);
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// Parse Vercel AI SDK data stream — proxy strips newlines
-function parseDataStream(text) {
-  let aiText = '';
-  const toolNames = [];
-
-  // Find all 0:"..." text tokens
-  // They appear as: }0:"text" or "0:"text" or \n0:"text"
-  // Use a simple approach: find every 0:" and parse the JSON string after it
-  let idx = 0;
-  while (idx < text.length) {
-    // Find next 0:" pattern
-    const pos = text.indexOf('0:"', idx);
-    if (pos === -1) break;
-
-    // Make sure this is a stream prefix, not inside a JSON value
-    // Check that char before is }, ", \n, or start of string
-    if (pos > 0) {
-      const prev = text[pos - 1];
-      if (prev !== '}' && prev !== '"' && prev !== '\n' && prev !== ')') {
-        idx = pos + 3;
-        continue;
-      }
-    }
-
-    // Extract the JSON string starting at the "
-    const strStart = pos + 2; // points to opening "
-    // Find the closing " (handle escaped quotes)
-    let j = strStart + 1;
-    while (j < text.length) {
-      if (text[j] === '\\') { j += 2; continue; }
-      if (text[j] === '"') break;
-      j++;
-    }
-    if (j < text.length) {
-      const jsonStr = text.slice(strStart, j + 1);
-      try {
-        aiText += JSON.parse(jsonStr);
-      } catch {}
-      idx = j + 1;
-    } else {
-      break;
-    }
-  }
-
-  // Find 9:{...toolName...} tool events
-  const toolRegex = /9:\{"toolCallId":"[^"]*","toolName":"([^"]*)"/g;
-  let m;
-  while ((m = toolRegex.exec(text)) !== null) {
-    toolNames.push(m[1]);
-  }
-
-  return { aiText, toolNames };
-}
-
 async function sendMessage() {
-  const text = input.value.trim();
+  var text = input.value.trim();
   if (!text) return;
-  if (!sessionId) { addMessage('ai', '⚠️ No active session.'); return; }
+  if (!sessionId) { addMessage('ai', '\u26a0\ufe0f No active session.'); return; }
 
   input.value = '';
   sendBtn.disabled = true;
@@ -108,40 +57,41 @@ async function sendMessage() {
   addMessage('user', text);
   messages.push({ role: 'user', content: text });
 
-  const aiEl = addMessage('ai', '');
-  aiEl.innerHTML = '<span class="typing">Thinking…</span>';
+  var aiEl = addMessage('ai', '');
+  aiEl.innerHTML = '<span class="typing">Thinking\u2026</span>';
 
   try {
-    const resp = await fetch(`${API_URL}/api/chat`, {
+    var resp = await fetch(API_URL + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, sessionId }),
+      body: JSON.stringify({ messages: messages, sessionId: sessionId }),
     });
 
     if (!resp.ok) {
-      const errText = await resp.text().catch(() => resp.statusText);
-      throw new Error(`Server error ${resp.status}: ${errText.slice(0, 200)}`);
+      var errText = '';
+      try { errText = await resp.text(); } catch(e2) { errText = resp.statusText; }
+      throw new Error('Server error ' + resp.status + ': ' + errText.slice(0, 200));
     }
 
-    const fullText = await resp.text();
-    const { aiText, toolNames } = parseDataStream(fullText);
+    var data = await resp.json();
 
-    toolNames.forEach(t => showToolUse(t));
+    // Show tool indicators
+    if (data.toolNames) {
+      data.toolNames.forEach(function(t) { showToolUse(t); });
+    }
 
-    if (aiText) {
-      aiEl.textContent = aiText;
-      messages.push({ role: 'assistant', content: aiText });
+    if (data.text) {
+      aiEl.textContent = data.text;
+      messages.push({ role: 'assistant', content: data.text });
+    } else if (data.error) {
+      aiEl.textContent = '\u274c ' + data.error;
+      messages.pop();
     } else {
-      aiEl.textContent = '🤔 No response. Try again or ask differently.';
-      console.log('[vercel-ext] No text. Length:', fullText.length);
-      // Log area around where 0: should appear (after last e: line)
-      const lastE = fullText.lastIndexOf('e:{');
-      if (lastE > -1) {
-        console.log('[vercel-ext] Around last e:', fullText.slice(lastE, lastE + 300));
-      }
+      aiEl.textContent = '\ud83e\udd14 No response. Try again.';
+      messages.pop();
     }
   } catch (e) {
-    aiEl.textContent = '❌ ' + e.message;
+    aiEl.textContent = '\u274c ' + e.message;
     messages.pop();
   }
 
