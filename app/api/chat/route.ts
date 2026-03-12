@@ -17,6 +17,12 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
+// Strip CSS pseudo-selectors that Webfuse parser doesn't support
+function sanitizeSelector(selector: string): string {
+  // Remove pseudo-classes and pseudo-elements (:hover, :first-child, ::before, etc.)
+  return selector.replace(/:{1,2}[a-zA-Z-]+(\([^)]*\))?/g, '').trim();
+}
+
 function truncateToolResults(tools: Record<string, any>): Record<string, any> {
   const wrapped: Record<string, any> = {};
   for (const [name, tool] of Object.entries(tools)) {
@@ -24,10 +30,19 @@ function truncateToolResults(tools: Record<string, any>): Record<string, any> {
     wrapped[name] = {
       ...tool,
       execute: async (args: any, options: any) => {
+        // Sanitize CSS selectors in see_domSnapshot calls
+        if (name === 'see_domSnapshot' && args?.options?.root) {
+          const original = args.options.root;
+          const sanitized = sanitizeSelector(original);
+          if (sanitized !== original) {
+            console.log(`[selector-fix] "${original}" -> "${sanitized}"`);
+            args.options.root = sanitized || 'body';
+          }
+        }
         const result = await origExecute(args, options);
         const str = typeof result === 'string' ? result : JSON.stringify(result);
         if (str.length > MAX_TOOL_RESULT_CHARS) {
-          return { content: [{ type: 'text', text: str.slice(0, MAX_TOOL_RESULT_CHARS) + '\n... [truncated, use a narrower selector]' }], isError: false };
+          return { content: [{ type: 'text', text: str.slice(0, MAX_TOOL_RESULT_CHARS) + '\n... [truncated — use a narrower CSS selector]' }], isError: false };
         }
         return result;
       },
@@ -63,16 +78,24 @@ The user is already viewing a page. You can see and interact with whatever they 
 RULES:
 - ALWAYS pass session_id: "${sessionId}" to every tool call
 - For see_domSnapshot, ALWAYS include options.root with a NARROW CSS selector
-- The user is ALREADY on a page — never ask for a URL. Just read the page.
-- Start by reading the title: options.root = "#firstHeading" or "h1"
-- For page content, use NARROW selectors like:
-  "#toc" for table of contents
-  ".infobox" for summary box
-  "p" for paragraphs (limited to visible ones)
-- Do NOT use broad selectors like "#mw-content-text .mw-parser-output" — too large!
-- NEVER call see_domSnapshot without options.root
-- Do NOT use see_guiSnapshot
-- Be concise and helpful.`,
+- The user is ALREADY on a page — never ask for a URL
+
+SELECTOR RULES (CRITICAL — invalid selectors will fail):
+- Use ONLY: tag names, #id, .class, attribute selectors, and combinators (>, +, ~, space)
+- NEVER use pseudo-selectors: NO :first-child, :nth-child(), :first-of-type, :has(), :not(), :contains(), ::before, ::after
+- These are NOT supported and will cause errors
+
+READING STRATEGY:
+1. Title: options.root = "#firstHeading" or "h1"
+2. Table of contents: options.root = "#toc"
+3. Summary box: options.root = ".infobox"
+4. For a specific section: use the section heading ID, e.g. "#Tourism", "#History", "#Geography"
+5. For section CONTENT: use the heading's parent wrapper, e.g. ".mw-heading + p", ".mw-heading + ul"
+   Or read a broader area: "#bodyContent p" (will be truncated to fit)
+6. For general pages: "main", "article", "#content"
+
+IMPORTANT: If a result says "[truncated]", use a NARROWER selector to get specific content.
+Be concise and helpful. Summarize what you read.`,
       messages,
       tools,
       maxSteps: 10,
