@@ -117,9 +117,18 @@ HANDLING LIST PAGES (e.g. Hacker News, search results, product listings):
 - To click a specific story/link, use act_click with a selector that targets it (e.g. the link text)
 - After clicking into an article, read the new page content, then you can go back
 
+HACKER NEWS SPECIFIC:
+- Each story has an ID visible in vote links like "vote?id=47350424" — extract the number
+- The COMMENTS page URL is: https://news.ycombinator.com/item?id=<ID>
+- The ARTICLE link is in the .titleline element
+- To open comments: use navigate with https://news.ycombinator.com/item?id=<ID>
+- To open the article itself: use act_click on the story title link
+- Comments on HN are in .comment elements inside .comtr table rows
+- To read comments: navigate to the item page, then see_domSnapshot with root ".comment-tree" or ".comtr"
+
 CLICKING LINKS:
 - To click a link by its text, use act_click with selector matching the link
-- To go back, use navigate with the previous URL or the browser back
+- To go back, use navigate with the previous URL
 
 IMPORTANT: Always read the page first before answering. Never guess or ask for context — the answer is on the page.
 
