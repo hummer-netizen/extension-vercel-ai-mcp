@@ -83,9 +83,12 @@ export async function POST(req: Request) {
       const rawTools = await mcpClient.tools();
       const tools = wrapTools(rawTools, emit);
 
-      // Auto-read page on first message
+      // Auto-read page on first message (skip if prompt already has read instructions)
       let contextMessages = [...messages];
-      if (messages.length === 1 && messages[0].role === 'user') {
+      const firstMsg = messages.length === 1 && messages[0].role === 'user' ? messages[0].content : '';
+      const hasReadInstructions = firstMsg.includes('see_domSnapshot') || firstMsg.includes('root selector');
+      
+      if (messages.length === 1 && messages[0].role === 'user' && !hasReadInstructions) {
         try {
           emit({ type: 'tool', name: 'see_domSnapshot' });
           const readTool = rawTools['see_domSnapshot'];
@@ -148,6 +151,7 @@ Be concise. Summarize what you find. Include ranks/numbers when listing items.`,
         messages: contextMessages,
         tools,
         maxSteps: 10,
+        maxTokens: 4096,
       });
 
       emit({ type: 'text', content: text });
