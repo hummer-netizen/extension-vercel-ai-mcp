@@ -1,12 +1,10 @@
 const API_URL = browser.webfuseSession.env.API_URL || 'https://vercel-ai-mcp.webfuse.it';
-const HN_URL = 'https://news.ycombinator.com';
 const messagesEl = document.getElementById('messages');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
 
 let messages = [];
 let sessionId = null;
-let currentUrl = HN_URL;
 
 (async () => {
   try {
@@ -23,15 +21,67 @@ input.addEventListener('keydown', (e) => {
 
 function askExample(el) {
   input.value = el.textContent;
-  // Reset messages so auto-read fires fresh on HN
   messages = [];
   sendMessage();
 }
 
-function addMessage(role, text) {
+// Lightweight markdown → HTML
+function mdToHtml(md) {
+  var html = md
+    // Escape HTML first
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Headers
+    .replace(/^### (.+)$/gm, '<strong>$1</strong>')
+    .replace(/^## (.+)$/gm, '<strong>$1</strong>')
+    .replace(/^# (.+)$/gm, '<strong style="font-size:1.1em">$1</strong>')
+    // Bold + italic
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Links: [text](url)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" onclick="event.preventDefault();window.open(\'$2\',\'_blank\')" style="color:#ff6600">$1</a>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 3px;border-radius:2px;font-size:0.9em">$1</code>')
+    // Horizontal rule
+    .replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid #e0d8d0;margin:6px 0">')
+    // Line breaks
+    .replace(/\n/g, '<br>');
+
+  // Convert numbered lists: lines starting with "1. ", "2. " etc
+  html = html.replace(/((?:^|\<br\>)\d+\.\s.+(?:\<br\>\d+\.\s.+)*)/g, function(block) {
+    var items = block.split('<br>').filter(function(l) { return l.match(/^\d+\.\s/); });
+    if (items.length === 0) return block;
+    var ol = '<ol style="margin:4px 0;padding-left:20px">';
+    items.forEach(function(item) {
+      ol += '<li>' + item.replace(/^\d+\.\s/, '') + '</li>';
+    });
+    ol += '</ol>';
+    return ol;
+  });
+
+  // Convert bullet lists: lines starting with "- " or "* "
+  html = html.replace(/((?:^|\<br\>)[\-\*]\s.+(?:\<br\>[\-\*]\s.+)*)/g, function(block) {
+    var items = block.split('<br>').filter(function(l) { return l.match(/^[\-\*]\s/); });
+    if (items.length === 0) return block;
+    var ul = '<ul style="margin:4px 0;padding-left:20px">';
+    items.forEach(function(item) {
+      ul += '<li>' + item.replace(/^[\-\*]\s/, '') + '</li>';
+    });
+    ul += '</ul>';
+    return ul;
+  });
+
+  return html;
+}
+
+function addMessage(role, content) {
   var el = document.createElement('div');
   el.className = 'msg ' + role;
-  el.textContent = text;
+  if (role === 'ai') {
+    el.innerHTML = mdToHtml(content);
+  } else {
+    el.textContent = content;
+  }
   messagesEl.appendChild(el);
   requestAnimationFrame(function() { messagesEl.scrollTop = messagesEl.scrollHeight; });
   return el;
@@ -65,7 +115,6 @@ async function sendMessage() {
   addMessage('user', text);
   messages.push({ role: 'user', content: text });
 
-  // Placeholder for AI response — will be replaced when text arrives
   var aiEl = null;
 
   try {
@@ -81,11 +130,9 @@ async function sendMessage() {
       throw new Error('Server error ' + resp.status + ': ' + errText.slice(0, 200));
     }
 
-    // Check if streaming (SSE) or JSON
     var contentType = resp.headers.get('content-type') || '';
 
     if (contentType.includes('text/event-stream')) {
-      // SSE streaming — tools appear in real-time, text comes last
       var reader = resp.body.getReader();
       var decoder = new TextDecoder();
       var buffer = '';
@@ -108,7 +155,7 @@ async function sendMessage() {
               aiEl = addMessage('ai', ev.content);
               messages.push({ role: 'assistant', content: ev.content });
             } else if (ev.type === 'error') {
-              aiEl = addMessage('ai', '❌ ' + ev.content);
+              addMessage('ai', '❌ ' + ev.content);
               messages.pop();
             }
           } catch (_) {}
@@ -120,7 +167,6 @@ async function sendMessage() {
         messages.pop();
       }
     } else {
-      // JSON fallback (old format)
       var data = await resp.json();
       if (data.toolNames) {
         data.toolNames.forEach(function(t) { showToolUse(t); });
