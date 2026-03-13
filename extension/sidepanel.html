@@ -54,6 +54,7 @@
     transition: all 0.1s;
   }
   .chip:hover { background: #ffeedd; border-color: #ff6600; color: #000; }
+  .chip.featured { background: #ffeedd; border-color: #ff6600; color: #000; font-weight: bold; }
   footer {
     padding: 6px 8px; border-top: 2px solid #ff6600;
     display: flex; gap: 6px; background: #f6f6ef;
@@ -92,17 +93,19 @@
   <div id="messages"></div>
   <div id="examples">
     <p>go ahead, try one:</p>
-    <div class="example-chips">
+    <div class="example-chips" id="chipList">
+      <span class="chip featured" onclick="askExample(this)">😂 Write a funny comment on #1</span>
+      <span class="chip" onclick="askExample(this)">💬 Comments on #1</span>
+      <span class="chip" onclick="askExample(this)">👀 Open story #3</span>
       <span class="chip" onclick="askExample(this)">🔥 What's trending?</span>
       <span class="chip" onclick="askExample(this)">📋 Top 5 stories</span>
       <span class="chip" onclick="askExample(this)">🏆 Most upvoted?</span>
-      <span class="chip" onclick="askExample(this)">💬 Comments on #1</span>
-      <span class="chip" onclick="askExample(this)">👀 Open story #3</span>
       <span class="chip" onclick="askExample(this)">🤖 Any AI posts?</span>
       <span class="chip" onclick="askExample(this)">🆕 Newest story?</span>
-      <span class="chip" onclick="askExample(this)">💼 Job posts?</span>
       <span class="chip" onclick="askExample(this)">🚀 Show HN posts?</span>
-      <span class="chip" onclick="askExample(this)">😂 Write a funny comment on #1</span>
+    </div>
+    <div id="chipToggle" style="display:none; text-align:center; padding: 4px;">
+      <span class="chip" onclick="showChips()" style="font-style:italic;">💡 more suggestions</span>
     </div>
   </div>
   <footer>

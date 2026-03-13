@@ -56,8 +56,13 @@ async function sendMessage() {
   if (!text) return;
   if (!sessionId) { addMessage('ai', '\u26a0\ufe0f No active session.'); return; }
 
-  // Hide examples after first message
-  if (examplesEl) examplesEl.style.display = 'none';
+  // Collapse chips after first message, show toggle
+  if (examplesEl && examplesEl.style.display !== 'none') {
+    var chipList = document.getElementById('chipList');
+    var chipToggle = document.getElementById('chipToggle');
+    if (chipList) chipList.style.display = 'none';
+    if (chipToggle) chipToggle.style.display = 'block';
+  }
 
   input.value = '';
   sendBtn.disabled = true;
@@ -107,3 +112,12 @@ async function sendMessage() {
   input.disabled = false;
   input.focus();
 }
+
+
+function showChips() {
+  var chipList = document.getElementById('chipList');
+  var chipToggle = document.getElementById('chipToggle');
+  if (chipList) chipList.style.display = '';
+  if (chipToggle) chipToggle.style.display = 'none';
+}
+window.showChips = showChips;
