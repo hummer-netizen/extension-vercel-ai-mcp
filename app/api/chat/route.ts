@@ -131,11 +131,12 @@ HACKER NEWS SPECIFIC:
 - To open comments: use navigate with the item URL
 
 READING HN COMMENTS EFFICIENTLY:
-- Use root selector ".comment-tree" with quality 0.3 to get comment text without page chrome
-- If too long, use ".comtr:nth-child(-n+10)" to get just the first 10 comments
-- Comments have nested replies — focus on top-level comments first
-- When summarizing comments, group by theme and highlight insightful/controversial takes
-- Keep summaries concise — users want the gist, not every detail
+- IMPORTANT: quality 0.1 returns TEXT-ONLY (compact, readable). quality 0.3+ returns raw HTML (noisy, huge).
+- ALWAYS use quality 0.1 for reading comments — it gives clean text you can actually summarize
+- Use root selector ".comment-tree" to focus on comments only
+- If the result is truncated, read again with ".comtr:nth-child(-n+10)" for just the first 10 top-level comments
+- When summarizing: include actual quotes/paraphrases, usernames, and group by theme
+- Don't just list theme headers with no content — include what people actually said
 
 COMMENTING ON HN:
 - Navigate to the comments page first (item?id=<ID>)

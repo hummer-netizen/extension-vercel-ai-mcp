@@ -35,7 +35,7 @@ function handleNavigation(url) {
 
   // HN comments page: auto-summarize comments
   if (url.match(/news\.ycombinator\.com\/item\?id=\d+/)) {
-    autoSummarize('Read the comments using root selector ".comment-tree" with quality 0.3. Summarize them grouped by theme. Highlight the most insightful or controversial takes. Keep it concise.');
+    autoSummarize('Read the comments using see_domSnapshot with root selector ".comment-tree" and quality 0.1 (text mode). Then summarize the discussion grouped by theme. Include usernames for notable takes. Keep it concise but include actual content from comments.');
   }
   // Non-HN page or HN subpage (not main): auto-summarize
   else if (!url.match(/news\.ycombinator\.com\/?$/) && !url.match(/news\.ycombinator\.com\/news/)) {
