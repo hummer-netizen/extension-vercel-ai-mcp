@@ -76,7 +76,7 @@ function mdToHtml(md) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, t, u) {
-      return '<a href="' + u + '" onclick="event.preventDefault();window.open(\'' + u + '\',\'_blank\')">' + t + '</a>';
+      return '<a href="' + u + '" class="nav-link" data-url="' + u.replace(/"/g, '&quot;') + '">' + t + '</a>';
     })
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/^---+$/gm, '<hr>')
@@ -214,3 +214,16 @@ async function sendMessage() {
   input.disabled = false;
   input.focus();
 }
+
+
+// Intercept clicks on links in AI messages — navigate within the session
+document.addEventListener('click', function(e) {
+  var link = e.target.closest('.nav-link');
+  if (!link) return;
+  e.preventDefault();
+  var url = link.dataset.url;
+  if (!url) return;
+
+  // Navigate the main browser tab via content script
+  browser.runtime.sendMessage({ type: 'navigate', url: url });
+});
