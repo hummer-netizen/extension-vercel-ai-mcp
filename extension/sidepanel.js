@@ -35,11 +35,11 @@ function handleNavigation(url) {
 
   // HN comments page: auto-summarize comments
   if (url.match(/news\.ycombinator\.com\/item\?id=\d+/)) {
-    autoSummarize('Summarize the comments on this page. Group by theme, highlight the most insightful ones.');
+    autoSummarize('Read the comments using root selector ".comment-tree" with quality 0.3. Summarize them grouped by theme. Highlight the most insightful or controversial takes. Keep it concise.');
   }
   // Non-HN page or HN subpage (not main): auto-summarize
   else if (!url.match(/news\.ycombinator\.com\/?$/) && !url.match(/news\.ycombinator\.com\/news/)) {
-    autoSummarize('Give me a quick summary of this page.');
+    autoSummarize('Read this page with root selector "article" or "main" or "body" at quality 0.3 and give me a concise summary.');
   }
 }
 

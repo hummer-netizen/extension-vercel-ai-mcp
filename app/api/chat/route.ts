@@ -129,7 +129,13 @@ HACKER NEWS SPECIFIC:
 - Each story has an ID visible in vote links like "vote?id=47350424"
 - Comments page URL: https://news.ycombinator.com/item?id=<ID>
 - To open comments: use navigate with the item URL
-- Comments are in .comtr table rows
+
+READING HN COMMENTS EFFICIENTLY:
+- Use root selector ".comment-tree" with quality 0.3 to get comment text without page chrome
+- If too long, use ".comtr:nth-child(-n+10)" to get just the first 10 comments
+- Comments have nested replies — focus on top-level comments first
+- When summarizing comments, group by theme and highlight insightful/controversial takes
+- Keep summaries concise — users want the gist, not every detail
 
 COMMENTING ON HN:
 - Navigate to the comments page first (item?id=<ID>)
