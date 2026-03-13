@@ -1,74 +1,99 @@
-const API_URL = browser.webfuseSession.env.API_URL || 'https://vercel-ai-mcp.webfuse.it';
-const messagesEl = document.getElementById('messages');
-const input = document.getElementById('input');
-const sendBtn = document.getElementById('send');
+var API_URL = browser.webfuseSession.env.API_URL || 'https://vercel-ai-mcp.webfuse.it';
+var HN_MAIN = 'https://news.ycombinator.com';
+var messagesEl = document.getElementById('messages');
+var input = document.getElementById('input');
+var sendBtn = document.getElementById('send');
 
-let messages = [];
-let sessionId = null;
+var messages = [];
+var sessionId = null;
+var currentPageUrl = HN_MAIN;
+var busy = false;
 
-(async () => {
+(async function() {
   try {
-    const info = await browser.webfuseSession.getSessionInfo();
+    var info = await browser.webfuseSession.getSessionInfo();
     sessionId = info.sessionId;
   } catch (e) {
     addMessage('ai', '⚠️ Could not connect to session.');
   }
 })();
 
-input.addEventListener('keydown', (e) => {
+input.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
-function askExample(el) {
-  input.value = el.textContent;
+// Listen for navigation events from content.js
+browser.runtime.onMessage.addListener(function(msg) {
+  if (msg.type === 'navigation' && msg.url) {
+    currentPageUrl = msg.url;
+    handleNavigation(msg.url);
+  }
+});
+
+function handleNavigation(url) {
+  if (busy) return; // don't interrupt an active request
+
+  // HN comments page: auto-summarize comments
+  if (url.match(/news\.ycombinator\.com\/item\?id=\d+/)) {
+    autoSummarize('Summarize the comments on this page. Group by theme, highlight the most insightful ones.');
+  }
+  // Non-HN page or HN subpage (not main): auto-summarize
+  else if (!url.match(/news\.ycombinator\.com\/?$/) && !url.match(/news\.ycombinator\.com\/news/)) {
+    autoSummarize('Give me a quick summary of this page.');
+  }
+}
+
+function autoSummarize(prompt) {
+  if (!sessionId || busy) return;
+  // Reset conversation for fresh context on new page
   messages = [];
+  // Small delay to let the page load
+  setTimeout(function() {
+    input.value = prompt;
+    sendMessage();
+  }, 1500);
+}
+
+function askExample(el) {
+  var text = el.dataset.prompt || el.textContent;
+  // For HN front-page chips, ensure we're on the main page
+  if (el.dataset.home === 'true' && !currentPageUrl.match(/news\.ycombinator\.com\/?$/)) {
+    text = 'First navigate to ' + HN_MAIN + ', then: ' + text;
+  }
+  messages = [];
+  input.value = text;
   sendMessage();
 }
 
 // Lightweight markdown → HTML
 function mdToHtml(md) {
   var html = md
-    // Escape HTML first
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // Headers
     .replace(/^### (.+)$/gm, '<strong>$1</strong>')
     .replace(/^## (.+)$/gm, '<strong>$1</strong>')
     .replace(/^# (.+)$/gm, '<strong style="font-size:1.1em">$1</strong>')
-    // Bold + italic
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Links: [text](url)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" onclick="event.preventDefault();window.open(\'$2\',\'_blank\')" style="color:#ff6600">$1</a>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 3px;border-radius:2px;font-size:0.9em">$1</code>')
-    // Horizontal rule
-    .replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid #e0d8d0;margin:6px 0">')
-    // Line breaks
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, t, u) {
+      return '<a href="' + u + '" onclick="event.preventDefault();window.open(\'' + u + '\',\'_blank\')">' + t + '</a>';
+    })
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^---+$/gm, '<hr>')
     .replace(/\n/g, '<br>');
 
-  // Convert numbered lists: lines starting with "1. ", "2. " etc
+  // Numbered lists
   html = html.replace(/((?:^|\<br\>)\d+\.\s.+(?:\<br\>\d+\.\s.+)*)/g, function(block) {
     var items = block.split('<br>').filter(function(l) { return l.match(/^\d+\.\s/); });
-    if (items.length === 0) return block;
-    var ol = '<ol style="margin:4px 0;padding-left:20px">';
-    items.forEach(function(item) {
-      ol += '<li>' + item.replace(/^\d+\.\s/, '') + '</li>';
-    });
-    ol += '</ol>';
-    return ol;
+    if (!items.length) return block;
+    return '<ol>' + items.map(function(i) { return '<li>' + i.replace(/^\d+\.\s/, '') + '</li>'; }).join('') + '</ol>';
   });
 
-  // Convert bullet lists: lines starting with "- " or "* "
+  // Bullet lists
   html = html.replace(/((?:^|\<br\>)[\-\*]\s.+(?:\<br\>[\-\*]\s.+)*)/g, function(block) {
     var items = block.split('<br>').filter(function(l) { return l.match(/^[\-\*]\s/); });
-    if (items.length === 0) return block;
-    var ul = '<ul style="margin:4px 0;padding-left:20px">';
-    items.forEach(function(item) {
-      ul += '<li>' + item.replace(/^[\-\*]\s/, '') + '</li>';
-    });
-    ul += '</ul>';
-    return ul;
+    if (!items.length) return block;
+    return '<ul>' + items.map(function(i) { return '<li>' + i.replace(/^[\-\*]\s/, '') + '</li>'; }).join('') + '</ul>';
   });
 
   return html;
@@ -77,7 +102,7 @@ function mdToHtml(md) {
 function addMessage(role, content) {
   var el = document.createElement('div');
   el.className = 'msg ' + role;
-  if (role === 'ai') {
+  if (role === 'ai' && content) {
     el.innerHTML = mdToHtml(content);
   } else {
     el.textContent = content;
@@ -106,9 +131,9 @@ function showToolUse(toolName) {
 
 async function sendMessage() {
   var text = input.value.trim();
-  if (!text) return;
-  if (!sessionId) { addMessage('ai', '⚠️ No active session.'); return; }
+  if (!text || !sessionId || busy) return;
 
+  busy = true;
   input.value = '';
   sendBtn.disabled = true;
   input.disabled = true;
@@ -184,6 +209,7 @@ async function sendMessage() {
     messages.pop();
   }
 
+  busy = false;
   sendBtn.disabled = false;
   input.disabled = false;
   input.focus();
