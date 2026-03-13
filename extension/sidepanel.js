@@ -1,18 +1,19 @@
 const API_URL = browser.webfuseSession.env.API_URL || 'https://vercel-ai-mcp.webfuse.it';
+const HN_URL = 'https://news.ycombinator.com';
 const messagesEl = document.getElementById('messages');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
-const examplesEl = document.getElementById('examples');
 
 let messages = [];
 let sessionId = null;
+let currentUrl = HN_URL;
 
 (async () => {
   try {
     const info = await browser.webfuseSession.getSessionInfo();
     sessionId = info.sessionId;
   } catch (e) {
-    addMessage('ai', '\u26a0\ufe0f Could not connect to Webfuse session.');
+    addMessage('ai', '⚠️ Could not connect to session.');
   }
 })();
 
@@ -22,47 +23,41 @@ input.addEventListener('keydown', (e) => {
 
 function askExample(el) {
   input.value = el.textContent;
+  // Reset messages so auto-read fires fresh on HN
+  messages = [];
   sendMessage();
 }
 
 function addMessage(role, text) {
-  const el = document.createElement('div');
+  var el = document.createElement('div');
   el.className = 'msg ' + role;
   el.textContent = text;
   messagesEl.appendChild(el);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  requestAnimationFrame(function() { messagesEl.scrollTop = messagesEl.scrollHeight; });
   return el;
 }
 
 function showToolUse(toolName) {
   var names = {
-    see_domSnapshot: 'reading the page...',
-    act_click: 'clicking something...',
-    act_type: 'typing away...',
-    act_keyPress: 'pressing keys...',
-    act_scroll: 'scrolling...',
-    navigate: 'navigating...',
-    wait: 'waiting...',
+    see_domSnapshot: 'reading the page…',
+    act_click: 'clicking…',
+    act_type: 'typing…',
+    act_keyPress: 'pressing key…',
+    act_scroll: 'scrolling…',
+    navigate: 'navigating…',
+    wait: 'waiting…',
   };
   var el = document.createElement('div');
   el.className = 'msg tool';
-  el.textContent = names[toolName] || ('\ud83d\udd27 ' + toolName);
+  el.textContent = names[toolName] || ('🔧 ' + toolName);
   messagesEl.appendChild(el);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  requestAnimationFrame(function() { messagesEl.scrollTop = messagesEl.scrollHeight; });
 }
 
 async function sendMessage() {
   var text = input.value.trim();
   if (!text) return;
-  if (!sessionId) { addMessage('ai', '\u26a0\ufe0f No active session.'); return; }
-
-  // Collapse chips after first message, show toggle
-  if (examplesEl && examplesEl.style.display !== 'none') {
-    var chipList = document.getElementById('chipList');
-    var chipToggle = document.getElementById('chipToggle');
-    if (chipList) chipList.style.display = 'none';
-    if (chipToggle) chipToggle.style.display = 'block';
-  }
+  if (!sessionId) { addMessage('ai', '⚠️ No active session.'); return; }
 
   input.value = '';
   sendBtn.disabled = true;
@@ -70,8 +65,8 @@ async function sendMessage() {
   addMessage('user', text);
   messages.push({ role: 'user', content: text });
 
-  var aiEl = addMessage('ai', '');
-  aiEl.innerHTML = '<span class="typing">Thinking\u2026</span>';
+  // Placeholder for AI response — will be replaced when text arrives
+  var aiEl = null;
 
   try {
     var resp = await fetch(API_URL + '/api/chat', {
@@ -86,25 +81,60 @@ async function sendMessage() {
       throw new Error('Server error ' + resp.status + ': ' + errText.slice(0, 200));
     }
 
-    var data = await resp.json();
+    // Check if streaming (SSE) or JSON
+    var contentType = resp.headers.get('content-type') || '';
 
-    // Show tool indicators
-    if (data.toolNames) {
-      data.toolNames.forEach(function(t) { showToolUse(t); });
-    }
+    if (contentType.includes('text/event-stream')) {
+      // SSE streaming — tools appear in real-time, text comes last
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
 
-    if (data.text) {
-      aiEl.textContent = data.text;
-      messages.push({ role: 'assistant', content: data.text });
-    } else if (data.error) {
-      aiEl.textContent = '\u274c ' + data.error;
-      messages.pop();
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          try {
+            var ev = JSON.parse(line.slice(6));
+            if (ev.type === 'tool') {
+              showToolUse(ev.name);
+            } else if (ev.type === 'text') {
+              aiEl = addMessage('ai', ev.content);
+              messages.push({ role: 'assistant', content: ev.content });
+            } else if (ev.type === 'error') {
+              aiEl = addMessage('ai', '❌ ' + ev.content);
+              messages.pop();
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (!aiEl) {
+        addMessage('ai', '🤔 No response. Try again.');
+        messages.pop();
+      }
     } else {
-      aiEl.textContent = '\ud83e\udd14 No response. Try again or ask differently.';
-      messages.pop();
+      // JSON fallback (old format)
+      var data = await resp.json();
+      if (data.toolNames) {
+        data.toolNames.forEach(function(t) { showToolUse(t); });
+      }
+      if (data.text) {
+        addMessage('ai', data.text);
+        messages.push({ role: 'assistant', content: data.text });
+      } else {
+        addMessage('ai', '🤔 No response.');
+        messages.pop();
+      }
     }
   } catch (e) {
-    aiEl.textContent = '\u274c ' + e.message;
+    addMessage('ai', '❌ ' + e.message);
     messages.pop();
   }
 
@@ -112,12 +142,3 @@ async function sendMessage() {
   input.disabled = false;
   input.focus();
 }
-
-
-function showChips() {
-  var chipList = document.getElementById('chipList');
-  var chipToggle = document.getElementById('chipToggle');
-  if (chipList) chipList.style.display = '';
-  if (chipToggle) chipToggle.style.display = 'none';
-}
-window.showChips = showChips;

@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Hacker News Copilot 🍊",
-  "version": "1.2",
+  "name": "Hacker News Copilot",
+  "version": "1.3",
   "description": "Your AI sidekick for the orange site — reads, summarizes, clicks, and comments",
   "background": { "service_worker": "background.js" },
   "side_panel": { "default_path": "sidepanel.html" },
   "host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png"
+  },
   "env": [
-    { "key": "API_URL", "value": "", "description": "Next.js server URL (e.g. https://your-app.vercel.app)" }
+    { "key": "API_URL", "value": "", "description": "Next.js server URL" }
   ]
 }
