@@ -1,0 +1,15 @@
+[Unit]
+Description=Vercel AI MCP Next.js Server
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/projects/extension-vercel-ai-mcp
+ExecStart=/usr/bin/npx next start --port 3001
+EnvironmentFile=/home/deploy/projects/extension-vercel-ai-mcp/.env.local
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
