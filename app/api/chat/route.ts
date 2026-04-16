@@ -28,7 +28,9 @@ function wrapTools(tools: Record<string, any>, emit: (event: any) => void): Reco
   const wrapped: Record<string, any> = {};
   for (const [name, tool] of Object.entries(tools)) {
     const origExecute = tool.execute;
-    wrapped[name] = {
+    // OpenAI requires function names to match ^[a-zA-Z0-9_-]+$ (no dots)
+    const safeName = name.replace(/\./g, '_');
+    wrapped[safeName] = {
       ...tool,
       execute: async (args: any, options: any) => {
         // Emit tool start event
