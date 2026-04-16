@@ -23,7 +23,7 @@ Deploy the `extension/` folder as a Webfuse extension. Set the `API_URL` env var
 The API route connects to Webfuse's Session MCP Server, which auto-discovers 13 browser tools. The Vercel AI SDK handles tool calls, chaining, and streaming.
 
 ```typescript
-// app/api/chat/route.ts — the entire backend
+// app/api/chat/route.ts, the entire backend
 const mcpClient = await createMCPClient({
   transport: new StreamableHTTPClientTransport(
     new URL("https://session-mcp.webfu.se/mcp"),
@@ -55,11 +55,11 @@ Webfuse Extension (sidebar)     Next.js API Route          Webfuse MCP
 
 ## Stack
 
-- **Next.js 15** — API routes + streaming
-- **Vercel AI SDK 4** — `streamText()` + `createMCPClient()` for MCP tool integration
-- **@modelcontextprotocol/sdk** — StreamableHTTP transport to Webfuse MCP
-- **Webfuse Extension** — Sidebar chat UI in the browser session
-- **Session MCP Server** — 13 browser tools (see, act, navigate, wait)
+- **Next.js 15**, API routes + streaming
+- **Vercel AI SDK 4**, `streamText()` + `createMCPClient()` for MCP tool integration
+- **@modelcontextprotocol/sdk**, StreamableHTTP transport to Webfuse MCP
+- **Webfuse Extension**, Sidebar chat UI in the browser session
+- **Session MCP Server**, 13 browser tools (see, act, navigate, wait)
 
 ## Swap Models in One Line
 
@@ -79,14 +79,18 @@ Same Webfuse tools work across all providers.
 - [Session MCP Server Docs](https://dev.webfu.se/session-mcp-server/)
 
 
-## Other Integrations
 
-Webfuse MCP works with any framework. See the other demos:
+## Other Webfuse Integrations
 
-- **[OpenAI Agents SDK](https://github.com/hummer-netizen/extension-openai-agents-mcp)** — Build a custom agent with the OpenAI Agents SDK
-- **[Claude Desktop / Cursor / VS Code](https://github.com/hummer-netizen/extension-claude-mcp)** — Zero-code setup — just a config file
-- **[LangChain / LangGraph](https://github.com/hummer-netizen/extension-langchain-mcp)** — Python research agent with multi-page reasoning
-- **[LiveKit Voice Agent](https://github.com/hummer-netizen/extension-livekit-mcp)** — Voice-controlled browser agent with WebRTC
+Webfuse MCP works with any AI framework:
+
+- **[OpenAI Agents SDK](https://github.com/webfuse-com/extension-openai-agents-mcp)** - Python agent with browser control
+- **[Claude Desktop / Cursor / VS Code](https://github.com/webfuse-com/extension-claude-mcp)** - Zero-code MCP config
+- **[LangChain / LangGraph](https://github.com/webfuse-com/extension-langchain-mcp)** - Multi-page research agent
+- **[Vercel AI SDK](https://github.com/webfuse-com/extension-vercel-ai-mcp)** - Next.js browsing assistant
+- **[LiveKit Voice Agent](https://github.com/webfuse-com/extension-livekit-mcp)** - Voice-controlled browser
+- **[ChatGPT GPT](https://github.com/webfuse-com/chatgpt-webfuse-mcp)** - Custom GPT with browser tools
+- **[WebMCP Demo](https://github.com/webfuse-com/webfuse-webmcp-demo)** - Semantic tools on any website
 
 ## License
 
