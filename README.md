@@ -8,6 +8,13 @@ Built with the [Vercel AI SDK](https://sdk.vercel.ai/), [MCP](https://modelconte
 
 A chat interface inside a Webfuse extension sidebar. Users type messages. The AI browses the page for them: reads content, clicks links, fills forms, takes screenshots, and reports back. All conversational.
 
+## Prerequisites
+
+- Node.js 18+
+- An [OpenAI](https://platform.openai.com) API key
+- A [Webfuse](https://webfuse.com) account with a Space
+- The Automation App installed on your Space
+
 ## Quick Start
 
 ```bash
