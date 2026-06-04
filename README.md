@@ -10,14 +10,15 @@ A chat interface in a Webfuse extension sidebar. Type a message, and the AI read
 
 ## Architecture
 
-```
-Webfuse Extension (sidebar)     Next.js API Route
-+--------------------+          +----------------------------+
-|  Chat UI           |--POST--->|  /api/chat                 |
-|  User messages     |          |                            |
-|                    |          |  createMCPClient() -------->  session-mcp.webfu.se
-|  AI responses      |<-stream-|  streamText()      <-tools--  13 browser tools
-+--------------------+          +----------------------------+
+```mermaid
+flowchart LR
+    A[User in Browser] -->|chat message| B[Webfuse Extension<br/>Sidebar Chat UI]
+    B -->|POST /api/chat| C[Next.js API Route<br/>Vercel AI SDK]
+    C -->|createMCPClient| D[Webfuse Session MCP<br/>13 auto-discovered tools]
+    C -->|streamText| E[OpenAI<br/>gpt-4o]
+    E -->|tool calls| C
+    D -->|click, type,<br/>navigate, read| F[Target Website]
+    C -->|SSE stream| B
 ```
 
 The API route connects to Webfuse's Session MCP Server, auto-discovers all 13 browser tools, and uses the Vercel AI SDK's `streamText()` to chain up to 10 tool calls per message.
